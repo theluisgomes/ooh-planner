@@ -1,0 +1,11 @@
+node_modules/
+# *.db # Commented out to allow DB deployment
+!database/ooh_planner.db
+*.db-journal
+.DS_Store
+.env
+npm-debug.log*
+
+# BigQuery credentials
+config/bigquery-key.json
+config/*.json

@@ -1,0 +1,18 @@
+function createBlockState(id) {
+    return {
+        id: id,
+        active: false,
+        filters: {
+            uf: 'Tudo',
+            praca: 'Tudo',
+            taxonomia: 'Tudo',
+            exibidores: 'Tudo',
+            formato: 'Tudo',
+            digital: 'Tudo',
+            estatico: 'Tudo'
+        },
+        seletor_qtd: null,
+        seletor_desc: 0,
+        result: null
+    };
+}

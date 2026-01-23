@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OOH Planner - Planejadora de Mídia Out-of-Home</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Header com Total Global -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <img src="logo.png" alt="Logo OOH Planner" class="logo-icon"
+                        style="width: 50px; height: 50px; border-radius: 100%;">
+                    <div>
+                        <h1>O Boticário</h1>
+                        <p class="subtitle">OOH PLANNER - DATA-FLOW V2.1</p>
+                    </div>
+                </div>
+
+                <div class="header-actions">
+                    <button class="btn btn-secondary" id="btnConfig">
+                        ⚙️ CONFIG
+                    </button>
+                    <button class="btn btn-primary" id="btnStore">
+                        💾 STORE ON BIGQUERY
+                    </button>
+                </div>
+
+                <div class="total-card">
+                    <div class="total-label">BUDGET LÍQUIDO ATUAL</div>
+                    <div class="total-value" id="totalCard">R$ 0,00</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Indicadores Globais -->
+    <section class="indicators-section">
+        <div class="container">
+            <div class="indicators-grid">
+                <div class="indicator-card">
+                    <h3>Eficiência Líquida <span style="font-size: 0.7em; opacity: 0.7;">(exposições/R$)</span></h3>
+                    <div class="indicator-bar">
+                        <div class="indicator-fill" id="eficienciaBar" style="width: 0%"></div>
+                    </div>
+                    <div class="indicator-labels">
+                        <span>0</span>
+                        <span>0.2</span>
+                        <span>0.5</span>
+                        <span>0.8</span>
+                        <span id="eficienciaValue">0</span>
+                    </div>
+                </div>
+
+                <div class="indicator-card">
+                    <h3>Índice de Exposição <span style="font-size: 0.7em; opacity: 0.7;">(milhões)</span></h3>
+                    <div class="indicator-bar exposure">
+                        <div class="indicator-fill" id="exposicaoBar" style="width: 0%"></div>
+                    </div>
+                    <div class="indicator-labels">
+                        <span>0</span>
+                        <span>2M</span>
+                        <span>4M</span>
+                        <span>6M</span>
+                        <span id="exposicaoValue">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Blocos de Mídia -->
+    <main class="main-content">
+        <div class="container">
+            <div id="mediaBlocks" class="media-blocks-grid">
+                <!-- Os blocos serão gerados dinamicamente via JS -->
+            </div>
+
+            <div class="actions-bar" style="text-align: center; margin: 2rem 0;">
+                <button id="btnAddBlock" class="btn btn-primary"
+                    style="background-color: var(--primary-color); border: none; padding: 12px 24px; font-weight: 600;"
+                    onclick="addBlock()">
+                    + ADICIONAR RECORTE DE MÍDIA
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Tabela Consolidada -->
+    <section class="consolidated-section">
+        <div class="container">
+            <div class="section-header">
+                <h2>📋 Tabela Consolidada</h2>
+                <div class="section-actions">
+                    <button class="btn btn-secondary" id="btnResetAll">🔄 Reset Tudo</button>
+                    <button class="btn btn-primary" id="btnExport">📥 Exportar CSV</button>
+                </div>
+            </div>
+
+            <div class="table-wrapper">
+                <table class="consolidated-table" id="consolidatedTable">
+                    <thead>
+                        <tr>
+                            <th>Mídia</th>
+                            <th>UF</th>
+                            <th>Praça</th>
+                            <th>Taxonomia</th>
+                            <th>Exibidores</th>
+                            <th>Formato</th>
+                            <th>Qtd</th>
+                            <th>Desc (%)</th>
+                            <th>Total Líquido</th>
+                            <th>Mínimo</th>
+                            <th>Máximo</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="consolidatedTableBody">
+                        <tr class="empty-state">
+                            <td colspan="12">Nenhuma mídia configurada ainda</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Template do Bloco de Mídia -->
+    <template id="mediaBlockTemplate">
+        <div class="media-block">
+            <div class="media-block-header">
+                <div class="media-number">
+                    <span class="number-badge">2</span>
+                    <div>
+                        <h3>RECORTE DE MÍDIA</h3>
+                        <p class="config-label">CONFIGURAÇÃO TÉCNICA #02</p>
+                    </div>
+                </div>
+                <div class="media-status">
+                    <span class="status-badge inactive">INATIVO</span>
+                    <button class="btn-icon btn-delete" title="Resetar bloco">🗑️</button>
+                </div>
+            </div>
+
+            <div class="media-block-content">
+                <div style="display: grid; grid-template-columns: 1fr 300px; gap: 2rem;">
+                    <!-- Left side: Filters and inputs -->
+                    <div>
+                        <!-- Row 1: Main filters -->
+                        <div class="filters-grid">
+                            <div class="form-group">
+                                <label>UF</label>
+                                <select class="form-control filter-uf">
+                                    <option value="Tudo">Tudo</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>PRAÇA</label>
+                                <select class="form-control filter-praca">
+                                    <option value="Tudo">Tudo</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>TAXONOMIA</label>
+                                <select class="form-control filter-taxonomia">
+                                    <option value="Tudo">Tudo</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>EXIBIDORES</label>
+                                <select class="form-control filter-exibidores">
+                                    <option value="Tudo">Tudo</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Row 2: Format, Quantity, Discount, Total -->
+                        <div class="filters-grid">
+                            <div class="form-group">
+                                <label>FORMATO</label>
+                                <select class="form-control filter-formato">
+                                    <option value="Tudo">Tudo</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>SELETOR_QTD</label>
+                                <input type="number" class="form-control input-qtd" min="0" placeholder="0">
+                            </div>
+
+                            <div class="form-group">
+                                <label>SELETOR_DESC (0-1)</label>
+                                <input type="number" class="form-control input-desc" min="0" max="1" step="0.01"
+                                    value="0" placeholder="0.15">
+                            </div>
+
+                            <div class="form-group result-card">
+                                <label>TOTAL LÍQUIDO</label>
+                                <div class="result-value">--</div>
+                            </div>
+                        </div>
+
+                        <!-- Row 3: Guardrails and additional filters -->
+                        <div class="guardrails-grid">
+                            <div class="guardrail-item">
+                                <label>MÍNIMO REC.</label>
+                                <div class="guardrail-value min-value">--</div>
+                            </div>
+
+                            <div class="guardrail-status">
+                                <div class="status-text">STATUS GUARDRAIL</div>
+                            </div>
+
+                            <div class="guardrail-item">
+                                <label>MÁXIMO REC.</label>
+                                <div class="guardrail-value max-value">--</div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>DIGITAL</label>
+                                <select class="form-control filter-digital">
+                                    <option value="Tudo">Tudo</option>
+                                    <option value="Sim">Sim</option>
+                                    <option value="Não">Não</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>ESTÁTICO</label>
+                                <select class="form-control filter-estatico">
+                                    <option value="Tudo">Tudo</option>
+                                    <option value="Sim">Sim</option>
+                                    <option value="Não">Não</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right side: Indicators -->
+                    <div class="indicator-bars">
+                        <div class="indicator-item">
+                            <h4>Eficiência Líquida</h4>
+                            <div class="indicator-bar-horizontal">
+                                <div class="indicator-fill eficiencia-fill" style="width: 0%"></div>
+                            </div>
+                            <div class="indicator-bar-labels">
+                                <span>0</span>
+                                <span>0.3</span>
+                                <span>0.5</span>
+                                <span>0.8</span>
+                                <span>1</span>
+                            </div>
+                        </div>
+
+                        <div class="indicator-item">
+                            <h4>Índice de Exposição</h4>
+                            <div class="indicator-bar-horizontal">
+                                <div class="indicator-fill exposicao-fill" style="width: 0%"></div>
+                            </div>
+                            <div class="indicator-bar-labels">
+                                <span>0</span>
+                                <span>2</span>
+                                <span>4</span>
+                                <span>6</span>
+                                <span>8</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mensagem de erro/aviso -->
+                <div class="block-message" style="display: none;"></div>
+            </div>
+        </div>
+    </template>
+
+    <script src="js/app.js"></script>
+</body>
+
+</html>

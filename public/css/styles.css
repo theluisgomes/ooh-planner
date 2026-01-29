@@ -22,19 +22,20 @@
     --error: #EF4444;
     --warning: #F59E0B;
     --success: #10B981;
-    
+    --info: #3B82F6;
+
     /* Spacing */
     --spacing-xs: 0.5rem;
     --spacing-sm: 0.75rem;
     --spacing-md: 1rem;
     --spacing-lg: 1.5rem;
     --spacing-xl: 2rem;
-    
+
     /* Border Radius */
     --radius-sm: 0.5rem;
     --radius-md: 0.75rem;
     --radius-lg: 1rem;
-    
+
     /* Shadows */
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
@@ -239,7 +240,7 @@ body {
 }
 
 /* ============================================
-   MEDIA BLOCKS - NEW CLEAN DESIGN
+   MEDIA BLOCKS - BUDGET-FIRST DESIGN
    ============================================ */
 .main-content {
     padding: 0 0 var(--spacing-xl) 0;
@@ -311,12 +312,257 @@ body {
     gap: var(--spacing-sm);
 }
 
+.status-badge {
+    padding: 0.375rem 0.875rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-badge.inactive {
+    background: rgba(148, 163, 184, 0.1);
+    color: var(--text-muted);
+}
+
+.status-badge.active {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success);
+}
+
 .media-block-content {
     padding: var(--spacing-lg);
 }
 
 /* ============================================
-   FORM CONTROLS - CLEAN DESIGN
+   PRIMARY BUDGET INPUTS
+   ============================================ */
+.primary-inputs-section {
+    background: linear-gradient(135deg, rgba(0, 217, 163, 0.03), rgba(99, 102, 241, 0.03));
+    border: 2px solid var(--primary);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+.input-group-primary {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: var(--spacing-lg);
+}
+
+.budget-primary input,
+.cycle-primary input {
+    background: white;
+    border: 2px solid var(--border);
+    font-size: 1.125rem;
+    font-weight: 600;
+    padding: 0.875rem 1rem;
+}
+
+.budget-primary input:focus,
+.cycle-primary input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(0, 217, 163, 0.1);
+}
+
+.budget-primary label,
+.cycle-primary label {
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+/* ============================================
+   OPTIONAL FILTERS (Collapsible)
+   ============================================ */
+.optional-filters-section {
+    margin-bottom: var(--spacing-lg);
+}
+
+.filters-toggle {
+    cursor: pointer;
+    padding: var(--spacing-md);
+    background: var(--bg-main);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    list-style: none;
+    user-select: none;
+}
+
+.filters-toggle:hover {
+    background: white;
+    border-color: var(--primary);
+}
+
+.filters-content {
+    margin-top: var(--spacing-md);
+}
+
+/* ============================================
+   RESULTS SECTION
+   ============================================ */
+.budget-results-section {
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-lg);
+    border-top: 2px solid var(--border-light);
+}
+
+.budget-status-card {
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+.status-indicator-main {
+    text-align: center;
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-md);
+    border-left: 4px solid var(--text-muted);
+}
+
+.status-indicator-main.status-ok {
+    background: rgba(16, 185, 129, 0.05);
+    border-left-color: var(--success);
+}
+
+.status-indicator-main.status-warning {
+    background: rgba(245, 158, 11, 0.05);
+    border-left-color: var(--warning);
+}
+
+.status-indicator-main.status-info {
+    background: rgba(59, 130, 246, 0.05);
+    border-left-color: var(--info);
+}
+
+.status-badge-large {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-xs);
+}
+
+.status-message-main {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Budget Metrics Grid */
+.budget-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.metric-card {
+    background: var(--bg-main);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    text-align: center;
+}
+
+.metric-label {
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    margin-bottom: var(--spacing-xs);
+}
+
+.metric-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* ============================================
+   PRIORITY TABLE
+   ============================================ */
+.faces-priority-section {
+    margin-top: var(--spacing-lg);
+}
+
+.faces-priority-section h4 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-md);
+}
+
+.priority-table-wrapper {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    overflow-x: auto;
+}
+
+.priority-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+}
+
+.priority-table thead {
+    background: var(--bg-main);
+}
+
+.priority-table th {
+    padding: var(--spacing-sm) var(--spacing-md);
+    text-align: left;
+    font-size: 0.625rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+    border-bottom: 1px solid var(--border);
+}
+
+.priority-table td {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-bottom: 1px solid var(--border-light);
+    color: var(--text-primary);
+}
+
+.priority-table tbody tr:hover {
+    background: rgba(0, 217, 163, 0.02);
+}
+
+/* Priority highlighting (Top 3) */
+.priority-table .priority-gold {
+    background: rgba(251, 191, 36, 0.08);
+}
+
+.priority-table .priority-silver {
+    background: rgba(209, 213, 219, 0.15);
+}
+
+.priority-table .priority-bronze {
+    background: rgba(251, 146, 60, 0.08);
+}
+
+.roi-badge {
+    display: inline-block;
+    padding: 0.25rem 0.625rem;
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success);
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 0.75rem;
+}
+
+/* ============================================
+   FORM CONTROLS
    ============================================ */
 .filters-grid {
     display: grid;
@@ -364,100 +610,6 @@ select.form-control {
     cursor: pointer;
 }
 
-.result-card {
-    background: var(--bg-main);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-md);
-}
-
-.result-value {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin-top: 0.25rem;
-}
-
-/* ============================================
-   GUARDRAILS - CLEAN DESIGN
-   ============================================ */
-.guardrails-grid {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: var(--spacing-md);
-    padding: var(--spacing-lg);
-    background: var(--bg-main);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border-light);
-}
-
-.guardrail-item {
-    text-align: center;
-}
-
-.guardrail-item label {
-    font-size: 0.6875rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    display: block;
-    margin-bottom: var(--spacing-xs);
-    font-weight: 600;
-}
-
-.guardrail-value {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--text-primary);
-}
-
-.guardrail-status {
-    text-align: center;
-}
-
-.status-text {
-    font-size: 0.6875rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    font-weight: 600;
-}
-
-/* Indicator bars on right side */
-.indicator-bars {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-lg);
-}
-
-.indicator-item h4 {
-    font-size: 0.8125rem;
-    color: var(--text-secondary);
-    margin-bottom: var(--spacing-sm);
-    font-weight: 600;
-}
-
-.indicator-bar-horizontal {
-    height: 0.5rem;
-    background: var(--bg-main);
-    border-radius: var(--radius-sm);
-    overflow: hidden;
-    position: relative;
-}
-
-.indicator-bar-horizontal .indicator-fill {
-    height: 100%;
-    border-radius: var(--radius-sm);
-}
-
-.indicator-bar-labels {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    margin-top: var(--spacing-xs);
-}
-
 .block-message {
     margin-top: var(--spacing-md);
     padding: var(--spacing-sm) var(--spacing-md);
@@ -476,34 +628,6 @@ select.form-control {
     background: rgba(245, 158, 11, 0.1);
     border: 1px solid var(--warning);
     color: var(--warning);
-}
-
-/* ============================================
-   ADD BLOCK BUTTON
-   ============================================ */
-.add-block-container {
-    text-align: center;
-    padding: var(--spacing-xl) 0;
-}
-
-.btn-add-block {
-    background: transparent;
-    border: 2px dashed var(--border);
-    color: var(--text-muted);
-    padding: var(--spacing-lg) var(--spacing-xl);
-    border-radius: var(--radius-lg);
-    font-weight: 600;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.btn-add-block:hover {
-    border-color: var(--primary);
-    color: var(--primary);
-    background: rgba(0, 217, 163, 0.05);
 }
 
 /* ============================================
@@ -585,9 +709,13 @@ select.form-control {
     .filters-grid {
         grid-template-columns: repeat(3, 1fr);
     }
-    
-    .guardrails-grid {
-        grid-template-columns: repeat(3, 1fr);
+
+    .input-group-primary {
+        grid-template-columns: 1fr;
+    }
+
+    .budget-metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
 }
 
@@ -596,15 +724,15 @@ select.form-control {
         flex-direction: column;
         align-items: stretch;
     }
-    
+
     .filters-grid {
         grid-template-columns: 1fr;
     }
-    
-    .guardrails-grid {
+
+    .budget-metrics-grid {
         grid-template-columns: 1fr;
     }
-    
+
     .indicators-grid {
         grid-template-columns: 1fr;
     }
@@ -618,6 +746,7 @@ select.form-control {
         opacity: 0;
         transform: translateY(10px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);

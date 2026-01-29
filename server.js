@@ -2,12 +2,13 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const Database = require('better-sqlite3');
+// const Database = require('better-sqlite3'); // Removed for BigQuery migration
 const bigQueryService = require('./services/bigquery-service');
+const sqliteService = require('./services/sqlite-service'); // Fallback
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DB_PATH = path.join(__dirname, 'database/ooh_planner.db');
+// const DB_PATH = path.join(__dirname, 'database/ooh_planner.db'); // Removed
 
 // Middleware
 app.use(cors());
@@ -15,15 +16,25 @@ app.use(express.json());
 app.use(express.static('public'));
 
 // Inicializar banco de dados
-let db;
-try {
-    db = new Database(DB_PATH, { readonly: true });
-    console.log('✅ Conectado ao banco de dados');
-} catch (err) {
-    console.error('❌ Erro ao conectar ao banco de dados:', err.message);
-    console.error('💡 Execute: npm run import');
-    process.exit(1);
-}
+// Migration to BigQuery: We assume BigQuery service handles connection natively
+console.log('✅ Configurado para usar BigQuery (com fallback SQLite)');
+
+// Determine which service to use
+let dataService = bigQueryService;
+let usingSQLiteFallback = false;
+
+// Try to initialize BigQuery, fallback to SQLite if it fails
+(async () => {
+    try {
+        await bigQueryService.initialize();
+        console.log('✅ BigQuery conectado com sucesso');
+    } catch (error) {
+        console.warn('⚠️  BigQuery indisponível, usando SQLite local');
+        dataService = sqliteService;
+        usingSQLiteFallback = true;
+        await sqliteService.initialize();
+    }
+})();
 
 // ============================================
 // API ENDPOINTS
@@ -33,18 +44,9 @@ try {
  * GET /api/filters
  * Retorna valores únicos para cada filtro
  */
-app.get('/api/filters', (req, res) => {
+app.get('/api/filters', async (req, res) => {
     try {
-        const filters = {
-            uf: db.prepare('SELECT DISTINCT uf FROM inventory WHERE uf IS NOT NULL ORDER BY uf').all().map(r => r.uf),
-            praca: db.prepare('SELECT DISTINCT praca FROM inventory WHERE praca IS NOT NULL ORDER BY praca').all().map(r => r.praca),
-            taxonomia: db.prepare('SELECT DISTINCT taxonomia FROM inventory WHERE taxonomia IS NOT NULL ORDER BY taxonomia').all().map(r => r.taxonomia),
-            exibidores: db.prepare('SELECT DISTINCT exibidores FROM inventory WHERE exibidores IS NOT NULL ORDER BY exibidores').all().map(r => r.exibidores),
-            formato: db.prepare('SELECT DISTINCT formato FROM inventory WHERE formato IS NOT NULL ORDER BY formato').all().map(r => r.formato),
-            digital: ['Tudo', 'Sim', 'Não'],
-            estatico: ['Tudo', 'Sim', 'Não']
-        };
-
+        const filters = await dataService.getFilters();
         res.json(filters);
     } catch (err) {
         console.error('Erro ao buscar filtros:', err);
@@ -56,38 +58,10 @@ app.get('/api/filters', (req, res) => {
  * POST /api/filters/available
  * Retorna valores disponíveis para cada filtro baseado nas seleções atuais
  */
-app.post('/api/filters/available', (req, res) => {
+app.post('/api/filters/available', async (req, res) => {
     try {
         const { filters } = req.body;
-
-        const fields = ['uf', 'praca', 'taxonomia', 'exibidores', 'formato'];
-        const availableOptions = {};
-
-        fields.forEach(field => {
-            let query = `SELECT DISTINCT ${field} FROM inventory WHERE ${field} IS NOT NULL`;
-            const params = [];
-
-            fields.forEach(otherField => {
-                if (field !== otherField && filters[otherField] && filters[otherField] !== 'Tudo') {
-                    query += ` AND ${otherField} = ?`;
-                    params.push(filters[otherField]);
-                }
-            });
-
-            if (filters.digital && filters.digital !== 'Tudo') {
-                query += ' AND digital = ?';
-                params.push(filters.digital === 'Sim' ? 1 : 0);
-            }
-
-            if (filters.estatico && filters.estatico !== 'Tudo') {
-                query += ' AND estatico = ?';
-                params.push(filters.estatico === 'Sim' ? 1 : 0);
-            }
-
-            query += ` ORDER BY ${field}`;
-            availableOptions[field] = db.prepare(query).all(...params).map(r => r[field]);
-        });
-
+        const availableOptions = await dataService.getAvailableFilters(filters);
         res.json(availableOptions);
     } catch (err) {
         console.error('Erro ao buscar filtros disponíveis:', err);
@@ -99,7 +73,7 @@ app.post('/api/filters/available', (req, res) => {
  * POST /api/calculate
  * Calcula totais baseado em filtros e inputs do usuário
  */
-app.post('/api/calculate', (req, res) => {
+app.post('/api/calculate', async (req, res) => {
     try {
         const { filters, seletor_qtd, seletor_desc } = req.body;
 
@@ -120,141 +94,8 @@ app.post('/api/calculate', (req, res) => {
             });
         }
 
-        // Construir query dinâmica
-        let query = 'SELECT * FROM inventory WHERE 1=1';
-        const params = [];
-
-        if (filters.uf && filters.uf !== 'Tudo') {
-            query += ' AND uf = ?';
-            params.push(filters.uf);
-        }
-
-        if (filters.praca && filters.praca !== 'Tudo') {
-            query += ' AND praca = ?';
-            params.push(filters.praca);
-        }
-
-        if (filters.taxonomia && filters.taxonomia !== 'Tudo') {
-            query += ' AND taxonomia = ?';
-            params.push(filters.taxonomia);
-        }
-
-        if (filters.exibidores && filters.exibidores !== 'Tudo') {
-            query += ' AND exibidores = ?';
-            params.push(filters.exibidores);
-        }
-
-        if (filters.formato && filters.formato !== 'Tudo') {
-            query += ' AND formato = ?';
-            params.push(filters.formato);
-        }
-
-        if (filters.digital && filters.digital !== 'Tudo') {
-            query += ' AND digital = ?';
-            params.push(filters.digital === 'Sim' ? 1 : 0);
-        }
-
-        if (filters.estatico && filters.estatico !== 'Tudo') {
-            query += ' AND estatico = ?';
-            params.push(filters.estatico === 'Sim' ? 1 : 0);
-        }
-
-        // Executar query
-        const stmt = db.prepare(query);
-        const results = stmt.all(...params);
-
-        if (results.length === 0) {
-            return res.json({
-                status: 'error',
-                message: 'Nenhum dado encontrado para os filtros selecionados',
-                total_liquido: null
-            });
-        }
-
-        // Agregar resultados (usar primeiro registro como referência)
-        const item = results[0];
-        const preco_unit = item.unitario_bruto_tabela;
-        const total_bruto = seletor_qtd * preco_unit;
-        const total_liquido = total_bruto * (1 - seletor_desc);
-
-        // Guardrails
-        const minimo = item.range_minimo;
-        const maximo = item.range_maximo;
-
-        // Validar guardrails
-        let warning = null;
-        if (minimo && seletor_qtd < minimo) {
-            warning = `Quantidade abaixo do mínimo recomendado (${minimo})`;
-        } else if (maximo && seletor_qtd > maximo) {
-            warning = `Quantidade acima do máximo recomendado (${maximo})`;
-        }
-
-        // Indicadores - Estimativas baseadas em dados disponíveis
-        // Como exposicao_unit e impacto_unit estão vazios, criamos estimativas
-        let exposicao_estimada = null;
-        let eficiencia = null;
-        let impacto_estimado = null;
-
-        // Fator de exposição baseado no formato (pessoas expostas por unidade)
-        const getExposureFactor = (formato, digital, estatico) => {
-            const formatoLower = (formato || '').toLowerCase();
-
-            // Formatos de alto impacto (grandes, alta visibilidade)
-            if (formatoLower.includes('empena') || formatoLower.includes('painel')) return 50000;
-            if (formatoLower.includes('metro') || formatoLower.includes('metrô')) return 45000;
-            if (formatoLower.includes('aeroporto')) return 40000;
-            if (formatoLower.includes('shopping')) return 35000;
-            if (formatoLower.includes('parque')) return 30000;
-
-            // Formatos de médio impacto
-            if (formatoLower.includes('abrigo') || formatoLower.includes('onibus') || formatoLower.includes('ônibus')) {
-                return digital ? 25000 : 20000;
-            }
-            if (formatoLower.includes('mub') || formatoLower.includes('banca')) return 22000;
-            if (formatoLower.includes('totem')) return digital ? 28000 : 18000;
-            if (formatoLower.includes('circuito')) return 20000;
-
-            // Formatos específicos de veículos
-            if (formatoLower.includes('backbus') || formatoLower.includes('back bus')) return 18000;
-            if (formatoLower.includes('backseat') || formatoLower.includes('back seat')) return 8000;
-            if (formatoLower.includes('envelopamento')) return 35000;
-            if (formatoLower.includes('exterior')) return 25000;
-
-            // Default: formato padrão
-            return digital ? 15000 : 12000;
-        };
-
-        // Calcular estimativas
-        const exposureFactor = getExposureFactor(item.formato, item.digital, item.estatico);
-        exposicao_estimada = seletor_qtd * exposureFactor;
-
-        // Impacto estimado (percentual de pessoas que realmente prestam atenção)
-        // Geralmente 10-30% da exposição, dependendo do formato
-        const impactRate = item.digital ? 0.25 : 0.15; // Digital tem mais impacto
-        impacto_estimado = exposicao_estimada * impactRate;
-
-        // Eficiência: exposição por real investido (quanto maior, melhor)
-        // Valores típicos: 50-500 (exposições por real)
-        if (total_liquido > 0) {
-            eficiencia = exposicao_estimada / total_liquido;
-        }
-
-        res.json({
-            status: 'success',
-            total_bruto,
-            total_liquido,
-            minimo,
-            maximo,
-            warning,
-            exposicao_estimada,
-            eficiencia,
-            impacto_estimado,
-            preco_unit,
-            records_found: results.length,
-            // Indicar que são estimativas
-            is_estimated: true,
-            exposure_factor: exposureFactor
-        });
+        const result = await dataService.calculate(filters, seletor_qtd, seletor_desc);
+        res.json(result);
 
     } catch (err) {
         console.error('Erro ao calcular:', err);
@@ -267,59 +108,57 @@ app.post('/api/calculate', (req, res) => {
 });
 
 /**
+ * POST /api/optimize-budget
+ * NEW: Budget-driven optimization endpoint
+ * Receives budget and campaign cycle, returns optimal face allocation
+ */
+app.post('/api/optimize-budget', async (req, res) => {
+    try {
+        const { budget, campaignCycle, filters = {} } = req.body;
+
+        // Validation
+        if (!budget || budget <= 0) {
+            return res.json({
+                status: 'error',
+                message: 'Budget não definido ou inválido'
+            });
+        }
+
+        if (!campaignCycle || campaignCycle <= 0) {
+            return res.json({
+                status: 'error',
+                message: 'Ciclo de campanha não definido ou inválido'
+            });
+        }
+
+        // Get filtered inventory from data service
+        const inventory = await dataService.getInventory(filters);
+
+        // Optimize budget allocation
+        const budgetOptimizer = require('./services/budget-optimizer');
+        const result = budgetOptimizer.optimizeAllocation(budget, campaignCycle, inventory);
+
+        res.json(result);
+
+    } catch (err) {
+        console.error('Erro ao otimizar budget:', err);
+        res.status(500).json({
+            status: 'error',
+            error: 'Erro ao otimizar alocação de budget',
+            message: err.message
+        });
+    }
+});
+
+/**
  * POST /api/inventory
  * Retorna inventário filtrado (para tabela consolidada)
  */
-app.post('/api/inventory', (req, res) => {
+app.post('/api/inventory', async (req, res) => {
     try {
         const { filters } = req.body;
-
-        let query = 'SELECT * FROM inventory WHERE 1=1';
-        const params = [];
-
-        // Aplicar filtros (mesmo código do /calculate)
-        if (filters.uf && filters.uf !== 'Tudo') {
-            query += ' AND uf = ?';
-            params.push(filters.uf);
-        }
-
-        if (filters.praca && filters.praca !== 'Tudo') {
-            query += ' AND praca = ?';
-            params.push(filters.praca);
-        }
-
-        if (filters.taxonomia && filters.taxonomia !== 'Tudo') {
-            query += ' AND taxonomia = ?';
-            params.push(filters.taxonomia);
-        }
-
-        if (filters.exibidores && filters.exibidores !== 'Tudo') {
-            query += ' AND exibidores = ?';
-            params.push(filters.exibidores);
-        }
-
-        if (filters.formato && filters.formato !== 'Tudo') {
-            query += ' AND formato = ?';
-            params.push(filters.formato);
-        }
-
-        if (filters.digital && filters.digital !== 'Tudo') {
-            query += ' AND digital = ?';
-            params.push(filters.digital === 'Sim' ? 1 : 0);
-        }
-
-        if (filters.estatico && filters.estatico !== 'Tudo') {
-            query += ' AND estatico = ?';
-            params.push(filters.estatico === 'Sim' ? 1 : 0);
-        }
-
-        query += ' LIMIT 100'; // Limitar resultados
-
-        const stmt = db.prepare(query);
-        const results = stmt.all(...params);
-
+        const results = await dataService.getInventory(filters);
         res.json(results);
-
     } catch (err) {
         console.error('Erro ao buscar inventário:', err);
         res.status(500).json({ error: 'Erro ao buscar inventário' });
@@ -330,15 +169,9 @@ app.post('/api/inventory', (req, res) => {
  * GET /api/stats
  * Retorna estatísticas do banco de dados
  */
-app.get('/api/stats', (req, res) => {
+app.get('/api/stats', async (req, res) => {
     try {
-        const stats = {
-            total_records: db.prepare('SELECT COUNT(*) as count FROM inventory').get().count,
-            total_ufs: db.prepare('SELECT COUNT(DISTINCT uf) as count FROM inventory').get().count,
-            total_pracas: db.prepare('SELECT COUNT(DISTINCT praca) as count FROM inventory').get().count,
-            total_formatos: db.prepare('SELECT COUNT(DISTINCT formato) as count FROM inventory').get().count
-        };
-
+        const stats = await dataService.getStats();
         res.json(stats);
     } catch (err) {
         console.error('Erro ao buscar estatísticas:', err);
@@ -416,6 +249,7 @@ app.listen(PORT, () => {
     console.log(`\n💡 Endpoints disponíveis:`);
     console.log(`   GET  /api/filters  - Lista de filtros disponíveis`);
     console.log(`   POST /api/calculate - Calcular totais`);
+    console.log(`   POST /api/optimize-budget - Otimizar alocação de budget (NEW)`);
     console.log(`   POST /api/inventory - Buscar inventário`);
     console.log(`   GET  /api/stats - Estatísticas do banco`);
     console.log(`   POST /api/bigquery/store - Armazenar dados no BigQuery`);
@@ -425,6 +259,6 @@ app.listen(PORT, () => {
 // Graceful shutdown
 process.on('SIGINT', () => {
     console.log('\n👋 Encerrando servidor...');
-    db.close();
+    // db.close(); // Migrated to BigQuery, no DB connection to close
     process.exit(0);
 });

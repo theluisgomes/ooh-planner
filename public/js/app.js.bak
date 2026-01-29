@@ -18,11 +18,6 @@ function createBlockState(id) {
             taxonomia: 'Tudo',
             exibidores: 'Tudo',
             formato: 'Tudo',
-            regional_boticario: 'Tudo',
-            cluster_exibidores: 'Tudo',
-            cluster_formato: 'Tudo',
-            periodicidade: 'Tudo',
-            flight: 'Tudo',
             digital: false,
             estatico: false
         },
@@ -225,7 +220,7 @@ function renderMediaBlocks() {
 }
 
 function populateFilters(blockElement, blockId, availableFilters = null) {
-    const filtersToPopulate = ['uf', 'regional_boticario', 'praca', 'taxonomia', 'cluster_exibidores', 'exibidores', 'cluster_formato', 'formato', 'periodicidade', 'flight'];
+    const filtersToPopulate = ['uf', 'praca', 'taxonomia', 'exibidores', 'formato'];
     const currentFilters = getBlockById(blockId).filters;
     const sourceFilters = availableFilters || state.filters;
 
@@ -311,7 +306,7 @@ function setupBlockListeners(blockElement, blockId) {
     });
 
     // Optional Filters (selects)
-    const selectFilters = ['uf', 'regional_boticario', 'praca', 'taxonomia', 'cluster_exibidores', 'exibidores', 'cluster_formato', 'formato', 'periodicidade', 'flight'];
+    const selectFilters = ['uf', 'praca', 'taxonomia', 'exibidores', 'formato'];
     selectFilters.forEach(filterName => {
         const select = blockElement.querySelector(`.filter-${filterName}`);
         if (select) {
@@ -367,19 +362,12 @@ function setupEventListeners() {
     document.getElementById('btnExport').addEventListener('click', exportCSV);
 
     // Config (placeholder)
-    // Config (placeholder)
-    const btnConfig = document.getElementById('btnConfig');
-    if (btnConfig) {
-        btnConfig.addEventListener('click', () => {
-            alert('Configurações em desenvolvimento');
-        });
-    }
+    document.getElementById('btnConfig').addEventListener('click', () => {
+        alert('Configurações em desenvolvimento');
+    });
 
     // Store to BigQuery
-    const btnStore = document.getElementById('btnStore');
-    if (btnStore) {
-        btnStore.addEventListener('click', storeToBigQuery);
-    }
+    document.getElementById('btnStore').addEventListener('click', storeToBigQuery);
 }
 
 // ============================================
@@ -517,39 +505,6 @@ function updateConsolidated() {
 
     document.getElementById('totalCard').textContent = formatCurrency(totalCard);
 
-    // ============================================
-    // ATUALIZAR INDICADORES (KPIs)
-    // ============================================
-    const totalExposure = activeBlocks.reduce((sum, b) => sum + (b.optimizationResult.exposicao_estimada || 0), 0);
-    const globalEfficiency = totalCard > 0 ? totalExposure / totalCard : 0;
-
-    // 1. Eficiência Líquida
-    const eficienciaValue = document.getElementById('eficienciaValue');
-    const eficienciaBar = document.getElementById('eficienciaBar');
-
-    if (eficienciaValue) eficienciaValue.textContent = globalEfficiency.toFixed(2);
-    if (eficienciaBar) {
-        // Assume 1.0 as "high" efficiency for bar scaling (can be adjusted)
-        const efficiencyPercent = Math.min((globalEfficiency / 1.0) * 100, 100);
-        eficienciaBar.style.width = `${efficiencyPercent}%`;
-        // Dynamic color
-        eficienciaBar.style.backgroundColor = globalEfficiency > 0.5 ? 'var(--success-color)' : globalEfficiency > 0.2 ? 'var(--warning-color)' : 'var(--danger-color)';
-    }
-
-    // 2. Índice de Exposição
-    const exposicaoValue = document.getElementById('exposicaoValue');
-    const exposicaoBar = document.getElementById('exposicaoBar');
-
-    if (exposicaoValue) {
-        const millions = totalExposure / 1000000;
-        exposicaoValue.textContent = millions > 0 ? millions.toFixed(1) + 'M' : '0';
-    }
-    if (exposicaoBar) {
-        // Scale: 6M as max based on UI labels
-        const exposurePercent = Math.min((totalExposure / 6000000) * 100, 100);
-        exposicaoBar.style.width = `${exposurePercent}%`;
-    }
-
     // Atualizar tabela consolidada
     const tbody = document.getElementById('consolidatedTableBody');
     tbody.innerHTML = '';
@@ -597,11 +552,6 @@ function resetBlock(blockId) {
         taxonomia: 'Tudo',
         exibidores: 'Tudo',
         formato: 'Tudo',
-        regional_boticario: 'Tudo',
-        cluster_exibidores: 'Tudo',
-        cluster_formato: 'Tudo',
-        periodicidade: 'Tudo',
-        flight: 'Tudo',
         digital: false,
         estatico: false
     };
@@ -703,7 +653,6 @@ function formatCurrency(value) {
 function showError(message) {
     alert(message);
 }
-
 function exportCSV() {
     const activeBlocks = state.mediaBlocks.filter(b => b.active && b.optimizationResult);
 
@@ -713,7 +662,7 @@ function exportCSV() {
     }
 
     // ===== PARTE 1: RESUMO DOS BLOCOS =====
-    const summaryHeaders = ['Mídia', 'Budget Input', 'Ciclo (semanas)', 'UF', 'Praça', 'Taxonomia', 'Exibidores', 'Formato', 'Região', 'Cluster Exibidores', 'Cluster Formato', 'Periodicidade', 'Flight', 'Digital', 'Estático', 'Faces Alocadas', 'Budget Utilizado', 'Budget Ideal', 'Sobrando', 'Status'];
+    const summaryHeaders = ['Mídia', 'Budget Input', 'Ciclo (semanas)', 'UF', 'Praça', 'Taxonomia', 'Exibidores', 'Formato', 'Digital', 'Estático', 'Faces Alocadas', 'Budget Utilizado', 'Budget Ideal', 'Sobrando', 'Status'];
     const summaryRows = activeBlocks.map(block => [
         `Mídia ${block.id}`,
         formatCurrency(block.budget),
@@ -723,11 +672,6 @@ function exportCSV() {
         block.filters.taxonomia || 'Tudo',
         block.filters.exibidores || 'Tudo',
         block.filters.formato || 'Tudo',
-        block.filters.regional_boticario || 'Tudo',
-        block.filters.cluster_exibidores || 'Tudo',
-        block.filters.cluster_formato || 'Tudo',
-        block.filters.periodicidade || 'Tudo',
-        block.filters.flight || 'Tudo',
         block.filters.digital ? 'Sim' : 'Não',
         block.filters.estatico ? 'Sim' : 'Não',
         block.optimizationResult.facesCount || 0,
@@ -766,7 +710,7 @@ function exportCSV() {
     // Seção 1: Resumo
     csv += '=== RESUMO DOS BLOCOS DE MÍDIA ===\n';
     csv += [summaryHeaders, ...summaryRows]
-        .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        .map(row => row.map(cell => `"${cell}"`).join(','))
         .join('\n');
 
     csv += '\n\n';
@@ -775,36 +719,27 @@ function exportCSV() {
     if (detailsRows.length > 0) {
         csv += '=== FACES RECOMENDADAS (DETALHADO) ===\n';
         csv += [detailsHeaders, ...detailsRows]
-            .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+            .map(row => row.map(cell => `"${cell}"`).join(','))
             .join('\n');
     }
 
-    // Download Strategy
-    // Removed trailing semicolon which confuses some browsers
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
+    // Download
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }); // BOM for Excel UTF-8
     const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
 
-    const timestamp = new Date().toISOString().split('T')[0];
-    const filename = `plano_ooh_${timestamp}.csv`;
-
-    // Explicitly set download property and href
-    link.href = url;
-    link.download = filename;
-    link.style.display = 'none';
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+    link.setAttribute('href', url);
+    link.setAttribute('download', `plano_ooh_${timestamp}.csv`);
+    link.style.visibility = 'hidden';
 
     document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 
-    // Small delay to ensure DOM is ready
-    setTimeout(() => {
-        link.click();
-
-        // Cleanup after download trigger (increased delay for safety)
-        setTimeout(() => {
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-        }, 500);
-    }, 50);
+    // Delay revocation to allow download to start
+    setTimeout(() => URL.revokeObjectURL(url), 100);
 
     console.log(`✅ CSV exportado: ${activeBlocks.length} blocos, ${detailsRows.length} faces detalhadas`);
 }
+

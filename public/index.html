@@ -25,14 +25,15 @@
                     </div>
                 </div>
 
-                <div class="header-actions">
+                <!-- Buttons removed as per request -->
+                <!-- <div class="header-actions">
                     <button class="btn btn-secondary" id="btnConfig">
                         ⚙️ CONFIG
                     </button>
                     <button class="btn btn-primary" id="btnStore">
                         💾 STORE ON BIGQUERY
                     </button>
-                </div>
+                </div> -->
 
                 <div class="total-card">
                     <div class="total-label">BUDGET LÍQUIDO ATUAL</div>
@@ -115,11 +116,11 @@
                             <th>Taxonomia</th>
                             <th>Exibidores</th>
                             <th>Formato</th>
-                            <th>Qtd</th>
-                            <th>Desc (%)</th>
-                            <th>Total Líquido</th>
-                            <th>Mínimo</th>
-                            <th>Máximo</th>
+                            <th>Faces</th>
+                            <th>Budget Input</th>
+                            <th>Budget Usado</th>
+                            <th>Ideal</th>
+                            <th>Sobrando</th>
                             <th>Status</th>
                         </tr>
                     </thead>
@@ -151,14 +152,38 @@
             </div>
 
             <div class="media-block-content">
-                <div style="display: grid; grid-template-columns: 1fr 300px; gap: 2rem;">
-                    <!-- Left side: Filters and inputs -->
-                    <div>
-                        <!-- Row 1: Main filters -->
+                <!-- PRIMARY INPUTS (Budget & Campaign Cycle) -->
+                <div class="primary-inputs-section">
+                    <div class="input-group-primary">
+                        <div class="form-group budget-primary">
+                            <label>💰 BUDGET TOTAL (R$)</label>
+                            <input type="number" class="form-control input-budget" placeholder="Ex: 50000" min="0"
+                                step="1000">
+                        </div>
+
+                        <div class="form-group cycle-primary">
+                            <label>📅 CICLO DE CAMPANHA (semanas)</label>
+                            <input type="number" class="form-control input-campaign-cycle" placeholder="Ex: 4" min="1"
+                                step="1">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- OPTIONAL FILTERS (Collapsible) -->
+                <details class="optional-filters-section">
+                    <summary class="filters-toggle">🔍 Filtros Adicionais (Opcional)</summary>
+                    <div class="filters-content">
                         <div class="filters-grid">
                             <div class="form-group">
                                 <label>UF</label>
                                 <select class="form-control filter-uf">
+                                    <option value="Tudo">Tudo</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>REGIÃO</label>
+                                <select class="form-control filter-regional_boticario">
                                     <option value="Tudo">Tudo</option>
                                 </select>
                             </div>
@@ -178,15 +203,26 @@
                             </div>
 
                             <div class="form-group">
+                                <label>CLUSTER EXIBIDORES</label>
+                                <select class="form-control filter-cluster_exibidores">
+                                    <option value="Tudo">Tudo</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
                                 <label>EXIBIDORES</label>
                                 <select class="form-control filter-exibidores">
                                     <option value="Tudo">Tudo</option>
                                 </select>
                             </div>
-                        </div>
 
-                        <!-- Row 2: Format, Quantity, Discount, Total -->
-                        <div class="filters-grid">
+                            <div class="form-group">
+                                <label>CLUSTER FORMATO</label>
+                                <select class="form-control filter-cluster_formato">
+                                    <option value="Tudo">Tudo</option>
+                                </select>
+                            </div>
+
                             <div class="form-group">
                                 <label>FORMATO</label>
                                 <select class="form-control filter-formato">
@@ -195,86 +231,88 @@
                             </div>
 
                             <div class="form-group">
-                                <label>SELETOR_QTD</label>
-                                <input type="number" class="form-control input-qtd" min="0" placeholder="0">
-                            </div>
-
-                            <div class="form-group">
-                                <label>SELETOR_DESC (0-1)</label>
-                                <input type="number" class="form-control input-desc" min="0" max="1" step="0.01"
-                                    value="0" placeholder="0.15">
-                            </div>
-
-                            <div class="form-group result-card">
-                                <label>TOTAL LÍQUIDO</label>
-                                <div class="result-value">--</div>
-                            </div>
-                        </div>
-
-                        <!-- Row 3: Guardrails and additional filters -->
-                        <div class="guardrails-grid">
-                            <div class="guardrail-item">
-                                <label>MÍNIMO REC.</label>
-                                <div class="guardrail-value min-value">--</div>
-                            </div>
-
-                            <div class="guardrail-status">
-                                <div class="status-text">STATUS GUARDRAIL</div>
-                            </div>
-
-                            <div class="guardrail-item">
-                                <label>MÁXIMO REC.</label>
-                                <div class="guardrail-value max-value">--</div>
-                            </div>
-
-                            <div class="form-group">
-                                <label>DIGITAL</label>
-                                <select class="form-control filter-digital">
+                                <label>PERIODICIDADE</label>
+                                <select class="form-control filter-periodicidade">
                                     <option value="Tudo">Tudo</option>
-                                    <option value="Sim">Sim</option>
-                                    <option value="Não">Não</option>
                                 </select>
                             </div>
 
                             <div class="form-group">
-                                <label>ESTÁTICO</label>
-                                <select class="form-control filter-estatico">
+                                <label>FLIGHT</label>
+                                <select class="form-control filter-flight">
                                     <option value="Tudo">Tudo</option>
-                                    <option value="Sim">Sim</option>
-                                    <option value="Não">Não</option>
                                 </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                    <input type="checkbox" class="filter-digital-checkbox"
+                                        style="width: 18px; height: 18px; cursor: pointer;">
+                                    <span>Digital</span>
+                                </label>
+                            </div>
+
+                            <div class="form-group">
+                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                    <input type="checkbox" class="filter-estatico-checkbox"
+                                        style="width: 18px; height: 18px; cursor: pointer;">
+                                    <span>Estático</span>
+                                </label>
                             </div>
                         </div>
                     </div>
+                </details>
 
-                    <!-- Right side: Indicators -->
-                    <div class="indicator-bars">
-                        <div class="indicator-item">
-                            <h4>Eficiência Líquida</h4>
-                            <div class="indicator-bar-horizontal">
-                                <div class="indicator-fill eficiencia-fill" style="width: 0%"></div>
-                            </div>
-                            <div class="indicator-bar-labels">
-                                <span>0</span>
-                                <span>0.3</span>
-                                <span>0.5</span>
-                                <span>0.8</span>
-                                <span>1</span>
-                            </div>
+                <!-- BUDGET STATUS & RESULTS -->
+                <div class="budget-results-section" style="display: none;">
+                    <div class="budget-status-card">
+                        <div class="status-indicator-main">
+                            <div class="status-badge-large">STATUS DO BUDGET</div>
+                            <div class="status-message-main">--</div>
                         </div>
+                    </div>
 
-                        <div class="indicator-item">
-                            <h4>Índice de Exposição</h4>
-                            <div class="indicator-bar-horizontal">
-                                <div class="indicator-fill exposicao-fill" style="width: 0%"></div>
-                            </div>
-                            <div class="indicator-bar-labels">
-                                <span>0</span>
-                                <span>2</span>
-                                <span>4</span>
-                                <span>6</span>
-                                <span>8</span>
-                            </div>
+                    <div class="budget-metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-label">Faces Alocadas</div>
+                            <div class="metric-value faces-count">--</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Budget Ideal</div>
+                            <div class="metric-value ideal-budget">--</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Budget Utilizado</div>
+                            <div class="metric-value allocated-budget">--</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Sobrando</div>
+                            <div class="metric-value remaining-budget">--</div>
+                        </div>
+                    </div>
+
+                    <!-- Priority List -->
+                    <div class="faces-priority-section">
+                        <h4>📋 Faces Recomendadas (por prioridade ROI)</h4>
+                        <div class="priority-table-wrapper">
+                            <table class="priority-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Praça</th>
+                                        <th>UF</th>
+                                        <th>Exibidores</th>
+                                        <th>Formato</th>
+                                        <th>Qtd</th>
+                                        <th>Custo Un.</th>
+                                        <th>Total</th>
+                                        <th>ROI</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="priority-list-body">
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>

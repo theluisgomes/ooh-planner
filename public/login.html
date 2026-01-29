@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - OOH Planner</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: var(--bg-main);
+        }
+
+        .login-card {
+            background: var(--bg-card);
+            padding: 2.5rem;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            width: 100%;
+            max-width: 400px;
+            border: 1px solid var(--border);
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .login-logo {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            margin-bottom: 1rem;
+        }
+
+        .login-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .login-subtitle {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-control {
+            width: 100%;
+        }
+
+        .btn-full {
+            width: 100%;
+            justify-content: center;
+            padding: 0.75rem;
+        }
+
+        .error-message {
+            color: var(--error);
+            font-size: 0.875rem;
+            text-align: center;
+            margin-top: 1rem;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="login-card">
+        <div class="login-header">
+            <img src="logo.png" alt="Logo" class="login-logo">
+            <h1 class="login-title">Bem-vindo(a)</h1>
+            <p class="login-subtitle">Faça login para acessar o OOH Planner</p>
+        </div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="username">Usuário</label>
+                <input type="text" id="username" class="form-control" required placeholder="Digite seu usuário"
+                    autofocus>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Senha</label>
+                <input type="password" id="password" class="form-control" required placeholder="Digite sua senha">
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full">ENTRAR</button>
+            <div id="errorMessage" class="error-message">Usuário ou senha inválidos</div>
+
+            <style>
+                .text-center {
+                    text-align: center;
+                    margin-top: 1.5rem;
+                }
+
+                .link {
+                    color: #00A859;
+                    text-decoration: none;
+                    font-weight: 500;
+                }
+
+                .link:hover {
+                    text-decoration: underline;
+                }
+            </style>
+            <div class="text-center">
+                <p class="login-subtitle">Não tem uma conta? <a href="signup.html" class="link">Criar Conta</a></p>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const errorMsg = document.getElementById('errorMessage');
+
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    window.location.href = '/';
+                } else {
+                    errorMsg.textContent = data.message || 'Erro ao fazer login';
+                    errorMsg.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error logging in:', error);
+                errorMsg.textContent = 'Erro de conexão';
+                errorMsg.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+
+</html>

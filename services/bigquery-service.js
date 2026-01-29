@@ -87,6 +87,8 @@ class BigQueryService {
             const schema = [
                 { name: 'session_id', type: 'STRING', mode: 'REQUIRED' },
                 { name: 'timestamp', type: 'TIMESTAMP', mode: 'REQUIRED' },
+                { name: 'plan_name', type: 'STRING', mode: 'NULLABLE' },
+                { name: 'version', type: 'INTEGER', mode: 'NULLABLE' },
                 { name: 'block_id', type: 'INTEGER', mode: 'REQUIRED' },
                 { name: 'uf', type: 'STRING', mode: 'NULLABLE' },
                 { name: 'praca', type: 'STRING', mode: 'NULLABLE' },
@@ -117,6 +119,34 @@ class BigQueryService {
             console.log(`✅ Table '${config.table}' created successfully`);
         } else {
             console.log(`✅ Table '${config.table}' already exists`);
+            // Note: If you need to add columns to an existing table, you would do it here using table.getMetadata() and checking schema
+        }
+    }
+
+    /**
+     * Get the next version number for a given plan name
+     */
+    async getNextVersion(planName) {
+        if (!planName) return 1;
+
+        const query = `
+            SELECT MAX(version) as max_version
+            FROM \`${config.projectId}.${config.dataset}.${config.table}\`
+            WHERE plan_name = @planName
+        `;
+
+        try {
+            const [rows] = await this.bigquery.query({
+                query,
+                params: { planName }
+            });
+
+            const maxVersion = rows[0]?.max_version || 0;
+            return maxVersion + 1;
+        } catch (error) {
+            // If table doesn't exist or other error, assume version 1
+            console.warn('Error fetching version, defaulting to 1:', error.message);
+            return 1;
         }
     }
 
@@ -131,11 +161,14 @@ class BigQueryService {
         }
 
         try {
-            const { activeBlocks, totalBudget } = planningData;
+            const { activeBlocks, totalBudget, planName } = planningData;
 
             if (!activeBlocks || activeBlocks.length === 0) {
                 throw new Error('No active blocks to store');
             }
+
+            // Determine version
+            const version = await this.getNextVersion(planName);
 
             // Generate unique session ID
             const sessionId = this.generateSessionId();
@@ -145,6 +178,8 @@ class BigQueryService {
             const rows = activeBlocks.map(block => ({
                 session_id: sessionId,
                 timestamp: timestamp,
+                plan_name: planName || 'Untitled Plan',
+                version: version,
                 block_id: block.id,
                 uf: block.filters.uf || null,
                 praca: block.filters.praca || null,
@@ -171,13 +206,16 @@ class BigQueryService {
 
             console.log(`✅ Successfully stored ${rows.length} blocks to BigQuery`);
             console.log(`   Session ID: ${sessionId}`);
+            console.log(`   Plan: ${planName} (v${version})`);
             console.log(`   Total Budget: R$ ${totalBudget.toFixed(2)}`);
 
             return {
                 success: true,
                 sessionId,
                 rowsInserted: rows.length,
-                timestamp
+                timestamp,
+                planName,
+                version
             };
 
         } catch (error) {

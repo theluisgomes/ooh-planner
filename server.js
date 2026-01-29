@@ -1,19 +1,44 @@
 require('dotenv').config();
 const express = require('express');
+const session = require('express-session');
 const cors = require('cors');
 const path = require('path');
 // const Database = require('better-sqlite3'); // Removed for BigQuery migration
 const bigQueryService = require('./services/bigquery-service');
 const sqliteService = require('./services/sqlite-service'); // Fallback
+const authService = require('./services/auth-service');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 // const DB_PATH = path.join(__dirname, 'database/ooh_planner.db'); // Removed
 
+// Initialize Auth Service
+authService.initialize();
+
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // For parsing form data
 app.use(express.static('public'));
+
+// Session Middleware
+app.use(session({
+    secret: 'boticario_ooh_planner_secret_key_change_in_prod',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: false, // Set to true if using HTTPS
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+}));
+
+// Auth Middleware
+const isAuthenticated = (req, res, next) => {
+    if (req.session && req.session.user) {
+        return next();
+    }
+    res.status(401).json({ error: 'Unauthorized', message: 'Please log in' });
+};
 
 // Inicializar banco de dados
 // Migration to BigQuery: We assume BigQuery service handles connection natively
@@ -37,6 +62,56 @@ let usingSQLiteFallback = false;
 })();
 
 // ============================================
+// AUTH ENDPOINTS
+// ============================================
+
+app.post('/login', (req, res) => {
+    const { username, password } = req.body;
+
+    const user = authService.verifyUser(username, password);
+
+    if (user) {
+        req.session.user = { id: user.id, username: user.username };
+        res.json({ success: true, user: req.session.user });
+    } else {
+        res.status(401).json({ success: false, message: 'Credenciais inválidas' });
+    }
+});
+
+app.post('/signup', (req, res) => {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+        return res.status(400).json({ success: false, message: 'Usuário e senha são obrigatórios' });
+    }
+
+    try {
+        const userId = authService.createUser(username, password);
+        // Auto login after signup
+        req.session.user = { id: userId, username };
+        res.json({ success: true, message: 'Usuário criado com sucesso!', user: req.session.user });
+    } catch (error) {
+        if (error.message.includes('UNIQUE constraint failed')) {
+            return res.status(409).json({ success: false, message: 'Usuário já existe' });
+        }
+        res.status(500).json({ success: false, message: 'Erro ao criar usuário' });
+    }
+});
+
+app.post('/logout', (req, res) => {
+    req.session.destroy();
+    res.json({ success: true });
+});
+
+app.get('/api/check-auth', (req, res) => {
+    if (req.session && req.session.user) {
+        res.json({ authenticated: true, user: req.session.user });
+    } else {
+        res.json({ authenticated: false });
+    }
+});
+
+// ============================================
 // API ENDPOINTS
 // ============================================
 
@@ -44,7 +119,7 @@ let usingSQLiteFallback = false;
  * GET /api/filters
  * Retorna valores únicos para cada filtro
  */
-app.get('/api/filters', async (req, res) => {
+app.get('/api/filters', isAuthenticated, async (req, res) => {
     try {
         const filters = await dataService.getFilters();
         res.json(filters);
@@ -58,7 +133,7 @@ app.get('/api/filters', async (req, res) => {
  * POST /api/filters/available
  * Retorna valores disponíveis para cada filtro baseado nas seleções atuais
  */
-app.post('/api/filters/available', async (req, res) => {
+app.post('/api/filters/available', isAuthenticated, async (req, res) => {
     try {
         const { filters } = req.body;
         const availableOptions = await dataService.getAvailableFilters(filters);
@@ -73,7 +148,7 @@ app.post('/api/filters/available', async (req, res) => {
  * POST /api/calculate
  * Calcula totais baseado em filtros e inputs do usuário
  */
-app.post('/api/calculate', async (req, res) => {
+app.post('/api/calculate', isAuthenticated, async (req, res) => {
     try {
         const { filters, seletor_qtd, seletor_desc } = req.body;
 
@@ -112,7 +187,7 @@ app.post('/api/calculate', async (req, res) => {
  * NEW: Budget-driven optimization endpoint
  * Receives budget and campaign cycle, returns optimal face allocation
  */
-app.post('/api/optimize-budget', async (req, res) => {
+app.post('/api/optimize-budget', isAuthenticated, async (req, res) => {
     try {
         const { budget, campaignCycle, filters = {} } = req.body;
 
@@ -154,7 +229,7 @@ app.post('/api/optimize-budget', async (req, res) => {
  * POST /api/inventory
  * Retorna inventário filtrado (para tabela consolidada)
  */
-app.post('/api/inventory', async (req, res) => {
+app.post('/api/inventory', isAuthenticated, async (req, res) => {
     try {
         const { filters } = req.body;
         const results = await dataService.getInventory(filters);
@@ -169,7 +244,7 @@ app.post('/api/inventory', async (req, res) => {
  * GET /api/stats
  * Retorna estatísticas do banco de dados
  */
-app.get('/api/stats', async (req, res) => {
+app.get('/api/stats', isAuthenticated, async (req, res) => {
     try {
         const stats = await dataService.getStats();
         res.json(stats);
@@ -183,9 +258,9 @@ app.get('/api/stats', async (req, res) => {
  * POST /api/bigquery/store
  * Store planning data to BigQuery
  */
-app.post('/api/bigquery/store', async (req, res) => {
+app.post('/api/bigquery/store', isAuthenticated, async (req, res) => {
     try {
-        const { activeBlocks, totalBudget } = req.body;
+        const { activeBlocks, totalBudget, planName } = req.body;
 
         // Validate input
         if (!activeBlocks || !Array.isArray(activeBlocks) || activeBlocks.length === 0) {
@@ -198,7 +273,8 @@ app.post('/api/bigquery/store', async (req, res) => {
         // Store data to BigQuery
         const result = await bigQueryService.storePlanningData({
             activeBlocks,
-            totalBudget
+            totalBudget,
+            planName
         });
 
         res.json(result);
@@ -213,10 +289,70 @@ app.post('/api/bigquery/store', async (req, res) => {
 });
 
 /**
+ * POST /api/plans
+ * Save a plan to the local user database
+ */
+app.post('/api/plans', isAuthenticated, (req, res) => {
+    try {
+        const { name, data } = req.body;
+        const userId = req.session.user.id;
+
+        if (!name || !data) {
+            return res.status(400).json({ success: false, message: 'Plan Name and Data are required' });
+        }
+
+        const planId = authService.savePlan(userId, name, data);
+        res.json({ success: true, message: 'Plano salvo com sucesso!', planId });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Erro ao salvar plano' });
+    }
+});
+
+/**
+ * GET /api/plans
+ * List plans for the current user
+ */
+app.get('/api/plans', isAuthenticated, (req, res) => {
+    try {
+        const userId = req.session.user.id;
+        const plans = authService.getUserPlans(userId);
+        res.json({ success: true, plans });
+    } catch (error) {
+        console.error('Error fetching plans:', error);
+        res.status(500).json({ success: false, message: 'Erro ao buscar planos' });
+    }
+});
+
+/**
+ * GET /api/plans/:id
+ * Get a specific plan
+ */
+app.get('/api/plans/:id', isAuthenticated, (req, res) => {
+    try {
+        const planId = req.params.id;
+        const plan = authService.getPlanById(planId);
+
+        if (!plan) {
+            return res.status(404).json({ success: false, message: 'Plano não encontrado' });
+        }
+
+        // Verify ownership (optional but recommended)
+        if (plan.user_id !== req.session.user.id) {
+            return res.status(403).json({ success: false, message: 'Acesso negado' });
+        }
+
+        res.json({ success: true, plan });
+    } catch (error) {
+        console.error('Error fetching plan:', error);
+        res.status(500).json({ success: false, message: 'Erro ao buscar plano details' });
+    }
+});
+
+/**
  * GET /api/bigquery/test
  * Test BigQuery connection
  */
-app.get('/api/bigquery/test', async (req, res) => {
+app.get('/api/bigquery/test', isAuthenticated, async (req, res) => {
     try {
         const isConnected = await bigQueryService.testConnection();
 

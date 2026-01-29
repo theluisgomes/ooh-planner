@@ -9,7 +9,7 @@ require('dotenv').config();
 const config = {
     projectId: process.env.BIGQUERY_PROJECT_ID || 'boticario-485202',
     dataset: process.env.BIGQUERY_DATASET || 'Boticario',
-    table: process.env.BIGQUERY_TABLE || 'planning_sessions',
+    table: process.env.BIGQUERY_TABLE || 'planning_history',
     // keyFilename is optional - if not provided, will use Application Default Credentials
     keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS || null
 };

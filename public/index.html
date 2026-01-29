@@ -35,6 +35,22 @@
                     </button>
                 </div> -->
 
+                <div class="header-actions">
+                    <a href="history.html" class="btn btn-secondary"
+                        style="padding: 0.5rem 1rem; font-size: 0.875rem; margin-right: 0.5rem; text-decoration: none; display: inline-flex; align-items: center;">
+                        📜 Histórico
+                    </a>
+                    <button class="btn btn-secondary" id="btnSavePlan"
+                        style="padding: 0.5rem 1rem; font-size: 0.875rem; margin-right: 0.5rem;">
+                        💾 Salvar Plano
+                    </button>
+                    <button class="btn btn-secondary" id="btnLogout" style="padding: 0.5rem 1rem; font-size: 0.875rem;">
+                        🚪 Sair
+                    </button>
+                    <!-- <button class="btn btn-secondary" id="btnConfig">⚙️ CONFIG</button> -->
+                    <!-- <button class="btn btn-primary" id="btnStore">💾 STORE ON BIGQUERY</button> -->
+                </div>
+
                 <div class="total-card">
                     <div class="total-label">BUDGET LÍQUIDO ATUAL</div>
                     <div class="total-value" id="totalCard">R$ 0,00</div>
@@ -49,29 +65,37 @@
             <div class="indicators-grid">
                 <div class="indicator-card">
                     <h3>Eficiência Líquida <span style="font-size: 0.7em; opacity: 0.7;">(exposições/R$)</span></h3>
-                    <div class="indicator-bar">
-                        <div class="indicator-fill" id="eficienciaBar" style="width: 0%"></div>
-                    </div>
-                    <div class="indicator-labels">
-                        <span>0</span>
-                        <span>0.2</span>
-                        <span>0.5</span>
-                        <span>0.8</span>
-                        <span id="eficienciaValue">0</span>
+                    <div class="chart-container">
+                        <div class="chart-labels">
+                            <span>Ineficiente</span>
+                            <span>Eficiente</span>
+                        </div>
+                        <div class="chart-track">
+                            <div class="chart-dashed-line"></div>
+                            <div class="chart-cursor baseline" title="Baseline"></div>
+                            <div class="chart-cursor current" id="eficienciaCursor" title="Atual"></div>
+                        </div>
+                        <div class="indicator-labels">
+                            <span id="eficienciaValue">0.00</span>
+                        </div>
                     </div>
                 </div>
 
                 <div class="indicator-card">
                     <h3>Índice de Exposição <span style="font-size: 0.7em; opacity: 0.7;">(milhões)</span></h3>
-                    <div class="indicator-bar exposure">
-                        <div class="indicator-fill" id="exposicaoBar" style="width: 0%"></div>
-                    </div>
-                    <div class="indicator-labels">
-                        <span>0</span>
-                        <span>2M</span>
-                        <span>4M</span>
-                        <span>6M</span>
-                        <span id="exposicaoValue">0</span>
+                    <div class="chart-container">
+                        <div class="chart-labels">
+                            <span>Under</span>
+                            <span>Over</span>
+                        </div>
+                        <div class="chart-track">
+                            <div class="chart-dashed-line"></div>
+                            <div class="chart-cursor baseline" title="Baseline"></div>
+                            <div class="chart-cursor current" id="exposicaoCursor" title="Atual"></div>
+                        </div>
+                        <div class="indicator-labels">
+                            <span id="exposicaoValue">0M</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -86,9 +110,7 @@
             </div>
 
             <div class="actions-bar" style="text-align: center; margin: 2rem 0;">
-                <button id="btnAddBlock" class="btn btn-primary"
-                    style="background-color: var(--primary-color); border: none; padding: 12px 24px; font-weight: 600;"
-                    onclick="addBlock()">
+                <button id="btnAddBlock" class="btn btn-primary" onclick="addBlock()">
                     + ADICIONAR RECORTE DE MÍDIA
                 </button>
             </div>
@@ -102,6 +124,7 @@
                 <h2>📋 Tabela Consolidada</h2>
                 <div class="section-actions">
                     <button class="btn btn-secondary" id="btnResetAll">🔄 Reset Tudo</button>
+                    <button class="btn btn-primary" id="btnStore">💾 Store on BigQuery</button>
                     <button class="btn btn-primary" id="btnExport">📥 Exportar CSV</button>
                 </div>
             </div>
@@ -324,6 +347,21 @@
     </template>
 
     <script src="js/app.js"></script>
+    <script>
+        document.getElementById('btnLogout').addEventListener('click', async () => {
+            try {
+                const response = await fetch('/logout', { method: 'POST' });
+                if (response.ok) {
+                    window.location.href = '/login.html';
+                } else {
+                    alert('Erro ao sair. Tente novamente.');
+                }
+            } catch (error) {
+                console.error('Erro ao fazer logout:', error);
+                alert('Erro de conexão ao tentar sair.');
+            }
+        });
+    </script>
 </body>
 
 </html>

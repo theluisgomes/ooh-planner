@@ -65,8 +65,30 @@ const state = {
 // ============================================
 // INITIALIZATION
 // ============================================
+// Função para verificar autenticação
+async function checkAuth() {
+    try {
+        const response = await fetch('/api/check-auth');
+        const data = await response.json();
+
+        if (!data.authenticated) {
+            window.location.href = '/login.html';
+            return false;
+        }
+        return true;
+    } catch (error) {
+        console.error('Erro ao verificar autenticação:', error);
+        return false;
+    }
+}
+
+// Inicialização
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('🚀 Inicializando OOH Planner...');
+
+    // Verificar autenticação antes de carregar dados
+    const isAuthenticated = await checkAuth();
+    if (!isAuthenticated) return;
 
     try {
         // Setup event listeners
@@ -75,8 +97,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Carregar filtros disponíveis
         await loadFilters();
 
-        // Renderizar blocos iniciais
-        renderMediaBlocks();
+        // Check for plan to load
+        const urlParams = new URLSearchParams(window.location.search);
+        const planId = urlParams.get('planId');
+
+        if (planId) {
+            await loadPlan(planId);
+        } else {
+            // Renderizar blocos iniciais
+            renderMediaBlocks();
+        }
 
         console.log('✅ Aplicação inicializada com sucesso!');
     } catch (err) {
@@ -380,6 +410,12 @@ function setupEventListeners() {
     if (btnStore) {
         btnStore.addEventListener('click', storeToBigQuery);
     }
+
+    // Save Plan
+    const btnSavePlan = document.getElementById('btnSavePlan');
+    if (btnSavePlan) {
+        btnSavePlan.addEventListener('click', savePlan);
+    }
 }
 
 // ============================================
@@ -517,37 +553,69 @@ function updateConsolidated() {
 
     document.getElementById('totalCard').textContent = formatCurrency(totalCard);
 
+
     // ============================================
     // ATUALIZAR INDICADORES (KPIs)
     // ============================================
     const totalExposure = activeBlocks.reduce((sum, b) => sum + (b.optimizationResult.exposicao_estimada || 0), 0);
+    // Calc Global Efficiency = Total Impressions / Total Cost (CPMs average out)
     const globalEfficiency = totalCard > 0 ? totalExposure / totalCard : 0;
 
     // 1. Eficiência Líquida
+    // Baseline = 1.0 (Unit Efficiency)
+    // Scale: 0.0 to 2.0 (Baseline at 50%)
     const eficienciaValue = document.getElementById('eficienciaValue');
-    const eficienciaBar = document.getElementById('eficienciaBar');
+    const eficienciaCursor = document.getElementById('eficienciaCursor');
 
     if (eficienciaValue) eficienciaValue.textContent = globalEfficiency.toFixed(2);
-    if (eficienciaBar) {
-        // Assume 1.0 as "high" efficiency for bar scaling (can be adjusted)
-        const efficiencyPercent = Math.min((globalEfficiency / 1.0) * 100, 100);
-        eficienciaBar.style.width = `${efficiencyPercent}%`;
-        // Dynamic color
-        eficienciaBar.style.backgroundColor = globalEfficiency > 0.5 ? 'var(--success-color)' : globalEfficiency > 0.2 ? 'var(--warning-color)' : 'var(--danger-color)';
+
+    if (eficienciaCursor) {
+        // Clamp between 0 and 2.0
+        const eff = Math.min(Math.max(globalEfficiency, 0), 2.0);
+        // Map 0 -> 0%, 1.0 -> 50%, 2.0 -> 100%
+        // Percent = (Value / Max) * 100
+        const percent = (eff / 2.0) * 100;
+        eficienciaCursor.style.left = `${percent}%`;
     }
 
     // 2. Índice de Exposição
+    // Baseline Logic: 
+    // Ideally we'd have a specific target. For now, let's assume Baseline = "Total Ideal Budget Potential".
+    // Or we use a fixed scale if requested. 
+    // Let's use the sum of "Ideal Budgets" of active blocks to estimate "Ideal Exposure".
+
+    const totalIdealBudget = activeBlocks.reduce((sum, b) => sum + (b.optimizationResult.idealBudget || 0), 0);
+    // Estimate Ideal Exposure based on current efficiency
+    // If allocated budget = X and exposure = Y, then Ideal Exposure ~= Ideal Budget * (Y/X)
+
+    let totalIdealExposure = 0;
+    if (totalCard > 0 && totalExposure > 0) {
+        const currentRate = totalExposure / totalCard;
+        totalIdealExposure = totalIdealBudget * currentRate;
+    } else {
+        // Fallback if no data: 6M (old max)
+        totalIdealExposure = 6000000;
+    }
+
+    // Set Scale Max = Ideal * 2 (so Ideal is at 50%)
+    const maxExposureScale = totalIdealExposure * 2 || 12000000;
+
     const exposicaoValue = document.getElementById('exposicaoValue');
-    const exposicaoBar = document.getElementById('exposicaoBar');
+    const exposicaoCursor = document.getElementById('exposicaoCursor');
 
     if (exposicaoValue) {
         const millions = totalExposure / 1000000;
         exposicaoValue.textContent = millions > 0 ? millions.toFixed(1) + 'M' : '0';
     }
-    if (exposicaoBar) {
-        // Scale: 6M as max based on UI labels
-        const exposurePercent = Math.min((totalExposure / 6000000) * 100, 100);
-        exposicaoBar.style.width = `${exposurePercent}%`;
+
+    if (exposicaoCursor) {
+        // Clamp
+        const exp = Math.min(Math.max(totalExposure, 0), maxExposureScale);
+        const percent = (exp / maxExposureScale) * 100;
+        exposicaoCursor.style.left = `${percent}%`;
+
+        // Also update baseline tooltip if possible or log it
+        // document.querySelector('.chart-cursor.baseline').title = `Baseline: ${(totalIdealExposure/1000000).toFixed(1)}M`;
     }
 
     // Atualizar tabela consolidada
@@ -628,18 +696,22 @@ function resetAll() {
 }
 
 async function storeToBigQuery() {
-    const activeBlocks = state.mediaBlocks.filter(b => b.active && b.result?.total_liquido);
+    const activeBlocks = state.mediaBlocks.filter(b => b.active && b.optimizationResult?.allocatedBudget > 0);
 
     if (activeBlocks.length === 0) {
         alert('❌ Nenhuma mídia configurada para armazenar');
         return;
     }
 
-    const totalBudget = activeBlocks.reduce((sum, b) => sum + b.result.total_liquido, 0);
+    const totalBudget = activeBlocks.reduce((sum, b) => sum + b.optimizationResult.allocatedBudget, 0);
 
     // Confirm with user
     const message = `Deseja armazenar ${activeBlocks.length} blocos de mídia no BigQuery?\n\nTotal Budget: ${formatCurrency(totalBudget)}`;
     if (!confirm(message)) return;
+
+    // Prompt for Plan Name
+    const planName = prompt("Digite um nome para este plano (Ex: Campanha Verão 2026):", "Novo Plano");
+    if (!planName) return; // User cancelled
 
     // Show loading state
     const btnStore = document.getElementById('btnStore');
@@ -648,19 +720,43 @@ async function storeToBigQuery() {
     btnStore.disabled = true;
 
     try {
+        // Map blocks to expected schema
+        // We need to map optimizationResult to the structure expected by the backend
+        const mappedBlocks = activeBlocks.map(b => {
+            const res = b.optimizationResult;
+            return {
+                id: b.id,
+                filters: b.filters,
+                seletor_qtd: res.facesCount, // Map faces count to quantity
+                seletor_desc: 0, // No discount selector in new UI
+                result: {
+                    total_liquido: res.allocatedBudget,
+                    total_bruto: res.allocatedBudget, // Assuming gross = net for now
+                    preco_unit: res.facesCount > 0 ? res.allocatedBudget / res.facesCount : 0,
+                    minimo: 0,
+                    maximo: 0,
+                    warning: res.statusMessage,
+                    exposicao_estimada: res.exposicao_estimada,
+                    eficiencia: res.eficiencia,
+                    records_found: res.totalInventorySize
+                }
+            };
+        });
+
         const response = await fetch(`${API_BASE}/bigquery/store`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                activeBlocks,
-                totalBudget
+                activeBlocks: mappedBlocks,
+                totalBudget,
+                planName
             })
         });
 
         const result = await response.json();
 
         if (result.success) {
-            alert(`✅ Dados armazenados com sucesso no BigQuery!\n\nSession ID: ${result.sessionId}\nBlocos: ${result.rowsInserted}\nTimestamp: ${new Date(result.timestamp).toLocaleString('pt-BR')}`);
+            alert(`✅ Dados armazenados com sucesso no BigQuery!\n\nPlano: ${result.planName} (v${result.version})\nSession ID: ${result.sessionId}\nBlocos: ${result.rowsInserted}`);
         } else {
             throw new Error(result.error || 'Erro desconhecido');
         }
@@ -681,10 +777,43 @@ async function storeToBigQuery() {
         }
 
         alert(errorMessage);
-    } finally {
         // Restore button state
         btnStore.innerHTML = originalText;
         btnStore.disabled = false;
+    }
+}
+
+async function savePlan() {
+    const activeBlocks = state.mediaBlocks.filter(b => b.active);
+
+    if (activeBlocks.length === 0) {
+        alert('❌ Nenhuma mídia configurada para salvar');
+        return;
+    }
+
+    const planName = prompt("Digite um nome para este plano:", "Meu Plano");
+    if (!planName) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/plans`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: planName,
+                data: state.mediaBlocks // Save entire state, including inactive blocks if desired, or just active
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            alert(`✅ Plano '${planName}' salvo com sucesso!`);
+        } else {
+            throw new Error(result.message);
+        }
+    } catch (error) {
+        console.error('Erro ao salvar plano:', error);
+        alert('❌ Erro ao salvar plano: ' + error.message);
     }
 }
 
@@ -807,4 +936,48 @@ function exportCSV() {
     }, 50);
 
     console.log(`✅ CSV exportado: ${activeBlocks.length} blocos, ${detailsRows.length} faces detalhadas`);
+}
+
+/**
+ * Load plan from server
+ */
+async function loadPlan(planId) {
+    try {
+        console.log(`Loading plan ${planId}...`);
+        const response = await fetch(`${API_BASE}/plans/${planId}`);
+
+        if (!response.ok) {
+            throw new Error('Plan not found or access denied');
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.plan) {
+            console.log('Plan data loaded:', data.plan);
+
+            // Restore state
+            state.mediaBlocks = data.plan.data;
+
+            // Generate IDs for blocks if missing (legacy support)
+            state.mediaBlocks.forEach((block, index) => {
+                if (!block.id) block.id = index + 1;
+            });
+
+            // Update nextBlockId
+            const maxId = Math.max(...state.mediaBlocks.map(b => b.id), 0);
+            state.nextBlockId = maxId + 1;
+
+            renderMediaBlocks();
+            updateConsolidated();
+
+            // Clear URL param without reload
+            window.history.replaceState({}, document.title, "/");
+
+            console.log('✅ Plan loaded successfully');
+        }
+    } catch (err) {
+        console.error('Error loading plan:', err);
+        showError('Erro ao carregar o plano. Ele pode ter sido excluído.');
+        renderMediaBlocks(); // Fallback to default
+    }
 }

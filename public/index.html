@@ -59,49 +59,6 @@
         </div>
     </header>
 
-    <!-- Indicadores Globais -->
-    <section class="indicators-section">
-        <div class="container">
-            <div class="indicators-grid">
-                <div class="indicator-card">
-                    <h3>Eficiência Líquida <span style="font-size: 0.7em; opacity: 0.7;">(exposições/R$)</span></h3>
-                    <div class="chart-container">
-                        <div class="chart-labels">
-                            <span>Ineficiente</span>
-                            <span>Eficiente</span>
-                        </div>
-                        <div class="chart-track">
-                            <div class="chart-dashed-line"></div>
-                            <div class="chart-cursor baseline" title="Baseline"></div>
-                            <div class="chart-cursor current" id="eficienciaCursor" title="Atual"></div>
-                        </div>
-                        <div class="indicator-labels">
-                            <span id="eficienciaValue">0.00</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="indicator-card">
-                    <h3>Índice de Exposição <span style="font-size: 0.7em; opacity: 0.7;">(milhões)</span></h3>
-                    <div class="chart-container">
-                        <div class="chart-labels">
-                            <span>Under</span>
-                            <span>Over</span>
-                        </div>
-                        <div class="chart-track">
-                            <div class="chart-dashed-line"></div>
-                            <div class="chart-cursor baseline" title="Baseline"></div>
-                            <div class="chart-cursor current" id="exposicaoCursor" title="Atual"></div>
-                        </div>
-                        <div class="indicator-labels">
-                            <span id="exposicaoValue">0M</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
     <!-- Blocos de Mídia -->
     <main class="main-content">
         <div class="container">
@@ -175,168 +132,172 @@
             </div>
 
             <div class="media-block-content">
-                <!-- PRIMARY INPUTS (Budget & Campaign Cycle) -->
-                <div class="primary-inputs-section">
-                    <div class="input-group-primary">
-                        <div class="form-group budget-primary">
+                <!-- CORE INPUTS (4 campos principais) -->
+                <div class="core-inputs-section">
+                    <h4 class="section-title">📝 Parâmetros Principais</h4>
+                    <div class="core-inputs-grid">
+                        <div class="form-group">
                             <label>💰 BUDGET TOTAL (R$)</label>
                             <input type="number" class="form-control input-budget" placeholder="Ex: 50000" min="0"
                                 step="1000">
                         </div>
 
-                        <div class="form-group cycle-primary">
-                            <label>📅 CICLO DE CAMPANHA (semanas)</label>
+                        <div class="form-group">
+                            <label>📅 CICLO (semanas)</label>
                             <input type="number" class="form-control input-campaign-cycle" placeholder="Ex: 4" min="1"
                                 step="1">
+                        </div>
+
+                        <div class="form-group">
+                            <label>🏷️ TAXONOMIA</label>
+                            <select class="form-control input-taxonomia">
+                                <option value="">Selecione...</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>📍 PRAÇA</label>
+                            <select class="form-control input-praca">
+                                <option value="">Selecione...</option>
+                            </select>
                         </div>
                     </div>
                 </div>
 
-                <!-- OPTIONAL FILTERS (Collapsible) -->
-                <details class="optional-filters-section">
-                    <summary class="filters-toggle">🔍 Filtros Adicionais (Opcional)</summary>
-                    <div class="filters-content">
-                        <div class="filters-grid">
-                            <div class="form-group">
-                                <label>UF</label>
-                                <select class="form-control filter-uf">
-                                    <option value="Tudo">Tudo</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label>REGIÃO</label>
-                                <select class="form-control filter-regional_boticario">
-                                    <option value="Tudo">Tudo</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label>PRAÇA</label>
-                                <select class="form-control filter-praca">
-                                    <option value="Tudo">Tudo</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label>TAXONOMIA</label>
-                                <select class="form-control filter-taxonomia">
-                                    <option value="Tudo">Tudo</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label>CLUSTER EXIBIDORES</label>
-                                <select class="form-control filter-cluster_exibidores">
-                                    <option value="Tudo">Tudo</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label>EXIBIDORES</label>
-                                <select class="form-control filter-exibidores">
-                                    <option value="Tudo">Tudo</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label>CLUSTER FORMATO</label>
-                                <select class="form-control filter-cluster_formato">
-                                    <option value="Tudo">Tudo</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label>FORMATO</label>
-                                <select class="form-control filter-formato">
-                                    <option value="Tudo">Tudo</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label>PERIODICIDADE</label>
-                                <select class="form-control filter-periodicidade">
-                                    <option value="Tudo">Tudo</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label>FLIGHT</label>
-                                <select class="form-control filter-flight">
-                                    <option value="Tudo">Tudo</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                    <input type="checkbox" class="filter-digital-checkbox"
-                                        style="width: 18px; height: 18px; cursor: pointer;">
-                                    <span>Digital</span>
-                                </label>
-                            </div>
-
-                            <div class="form-group">
-                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                    <input type="checkbox" class="filter-estatico-checkbox"
-                                        style="width: 18px; height: 18px; cursor: pointer;">
-                                    <span>Estático</span>
-                                </label>
-                            </div>
+                <!-- IDEAL PLAN RECOMMENDATION (auto-generated) -->
+                <div class="ideal-plan-section" style="display: none;">
+                    <h4 class="section-title">💡 Plano Ideal Recomendado</h4>
+                    <div class="ideal-plan-summary">
+                        <div class="ideal-metric">
+                            <span class="metric-label">Total de Faces:</span>
+                            <span class="metric-value ideal-total-faces">--</span>
+                        </div>
+                        <div class="ideal-metric">
+                            <span class="metric-label">Custo Total:</span>
+                            <span class="metric-value ideal-total-cost">--</span>
+                        </div>
+                        <div class="ideal-metric">
+                            <span class="metric-label">Exposição:</span>
+                            <span class="metric-value ideal-total-exposure">--</span>
                         </div>
                     </div>
-                </details>
+                    <div class="ideal-formats-grid">
+                        <!-- Populated dynamically with format cards -->
+                    </div>
+                </div>
 
-                <!-- BUDGET STATUS & RESULTS -->
-                <div class="budget-results-section" style="display: none;">
-                    <div class="budget-status-card">
-                        <div class="status-indicator-main">
-                            <div class="status-badge-large">STATUS DO BUDGET</div>
-                            <div class="status-message-main">--</div>
+                <!-- MANUAL ADJUSTMENT SECTION -->
+                <div class="manual-adjustment-section" style="display: none;">
+                    <h4 class="section-title">✏️ Ajuste Manual (Realidade de Negociação)</h4>
+                    <p class="section-description">Ajuste as quantidades conforme a disponibilidade real do fornecedor
+                    </p>
+                    <div class="manual-adjustment-grid">
+                        <!-- Populated dynamically with editable inputs -->
+                    </div>
+                    <button class="btn btn-primary btn-generate-list" style="margin-top: 1rem;">
+                        📋 Gerar Lista de Players
+                    </button>
+                </div>
+
+                <!-- EFFICIENCY INDICATORS -->
+                <div class="efficiency-section" style="display: none;">
+                    <h4 class="section-title">📊 Análise de Eficiência</h4>
+
+                    <!-- Comparison Cards -->
+                    <div class="efficiency-comparison">
+                        <div class="efficiency-card">
+                            <div class="efficiency-label">Plano Ideal</div>
+                            <div class="efficiency-value ideal-efficiency-value">--</div>
+                            <div class="efficiency-sublabel">exposições/R$</div>
+                        </div>
+                        <div class="efficiency-arrow">→</div>
+                        <div class="efficiency-card">
+                            <div class="efficiency-label">Plano Ajustado</div>
+                            <div class="efficiency-value manual-efficiency-value">--</div>
+                            <div class="efficiency-sublabel">exposições/R$</div>
                         </div>
                     </div>
 
-                    <div class="budget-metrics-grid">
-                        <div class="metric-card">
-                            <div class="metric-label">Faces Alocadas</div>
-                            <div class="metric-value faces-count">--</div>
+                    <!-- Efficiency Sliders -->
+                    <div class="efficiency-sliders-grid">
+                        <!-- Eficiência Líquida Slider -->
+                        <div class="slider-card">
+                            <div class="slider-header">
+                                <span class="slider-title">EFICIÊNCIA LÍQUIDA</span>
+                                <span class="slider-value ideal-efficiency-slider-value">--</span>
+                            </div>
+                            <div class="slider-track-container">
+                                <div class="slider-labels">
+                                    <span>INEFICIENTE</span>
+                                    <span>EFICIENTE</span>
+                                </div>
+                                <div class="slider-track">
+                                    <div class="slider-dashed-line"></div>
+                                    <div class="slider-cursor baseline" style="left: 50%;"></div>
+                                    <div class="slider-cursor current efficiency-cursor" style="left: 0%;"></div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="metric-card">
-                            <div class="metric-label">Budget Ideal</div>
-                            <div class="metric-value ideal-budget">--</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-label">Budget Utilizado</div>
-                            <div class="metric-value allocated-budget">--</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-label">Sobrando</div>
-                            <div class="metric-value remaining-budget">--</div>
+
+                        <!-- Índice de Exposição Slider -->
+                        <div class="slider-card">
+                            <div class="slider-header">
+                                <span class="slider-title">ÍNDICE DE EXPOSIÇÃO</span>
+                                <span class="slider-value exposure-slider-value">--</span>
+                            </div>
+                            <div class="slider-track-container">
+                                <div class="slider-labels">
+                                    <span>UNDER</span>
+                                    <span>OVER</span>
+                                </div>
+                                <div class="slider-track">
+                                    <div class="slider-dashed-line"></div>
+                                    <div class="slider-cursor baseline" style="left: 50%;"></div>
+                                    <div class="slider-cursor current exposure-cursor" style="left: 0%;"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Priority List -->
-                    <div class="faces-priority-section">
-                        <h4>📋 Faces Recomendadas (por prioridade ROI)</h4>
-                        <div class="priority-table-wrapper">
-                            <table class="priority-table">
-                                <thead>
-                                    <tr>
-                                        <th>#</th>
-                                        <th>Praça</th>
-                                        <th>UF</th>
-                                        <th>Exibidores</th>
-                                        <th>Formato</th>
-                                        <th>Qtd</th>
-                                        <th>Custo Un.</th>
-                                        <th>Total</th>
-                                        <th>ROI</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="priority-list-body">
-                                    <!-- Populated dynamically -->
-                                </tbody>
-                            </table>
+                    <!-- Status Bar -->
+                    <div class="efficiency-status-bar">
+                        <div class="efficiency-bar">
+                            <div class="efficiency-fill" style="width: 0%"></div>
                         </div>
+                        <div class="efficiency-status">--</div>
+                    </div>
+                </div>
+
+                <!-- PLAYER LIST (final output) -->
+                <div class="player-list-section" style="display: none;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h4 class="section-title" style="margin: 0;">📋 Lista de Players e Formatos</h4>
+                        <button class="btn btn-secondary btn-export-csv" style="font-size: 0.875rem;">
+                            📥 Exportar CSV
+                        </button>
+                    </div>
+                    <div class="player-table-wrapper">
+                        <table class="player-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Praça</th>
+                                    <th>UF</th>
+                                    <th>Exibidores</th>
+                                    <th>Formato</th>
+                                    <th>Qtd Ideal</th>
+                                    <th>Qtd Negociada</th>
+                                    <th>Desconto %</th>
+                                    <th>Preço Un.</th>
+                                    <th>Total</th>
+                                    <th>ROI</th>
+                                </tr>
+                            </thead>
+                            <tbody class="player-list-body">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 

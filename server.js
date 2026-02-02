@@ -226,6 +226,132 @@ app.post('/api/optimize-budget', isAuthenticated, async (req, res) => {
 });
 
 /**
+ * POST /api/get-ideal-plan
+ * NEW: Get ideal plan recommendation based on 4 core inputs
+ * Returns format-level recommendations with quantities
+ */
+app.post('/api/get-ideal-plan', isAuthenticated, async (req, res) => {
+    try {
+        const { budget, campaignCycle, taxonomia, praca } = req.body;
+
+        // Validation
+        if (!budget || budget <= 0) {
+            return res.json({
+                status: 'error',
+                message: 'Budget não definido ou inválido'
+            });
+        }
+
+        if (!campaignCycle || campaignCycle <= 0) {
+            return res.json({
+                status: 'error',
+                message: 'Ciclo de campanha não definido ou inválido'
+            });
+        }
+
+        if (!taxonomia) {
+            return res.json({
+                status: 'error',
+                message: 'Taxonomia não definida'
+            });
+        }
+
+        if (!praca) {
+            return res.json({
+                status: 'error',
+                message: 'Praça não definida'
+            });
+        }
+
+        // Get full inventory
+        const inventory = await dataService.getInventory({});
+
+        // Generate ideal plan
+        const recommendationService = require('./services/recommendation-service');
+        const idealPlan = recommendationService.getIdealPlan(
+            budget,
+            campaignCycle,
+            taxonomia,
+            praca,
+            inventory
+        );
+
+        res.json(idealPlan);
+
+    } catch (err) {
+        console.error('Erro ao gerar plano ideal:', err);
+        res.status(500).json({
+            status: 'error',
+            error: 'Erro ao gerar plano ideal',
+            message: err.message
+        });
+    }
+});
+
+/**
+ * POST /api/calculate-efficiency
+ * NEW: Calculate efficiency metrics comparing manual vs ideal plan
+ */
+app.post('/api/calculate-efficiency', isAuthenticated, async (req, res) => {
+    try {
+        const { manualPlan, idealPlan } = req.body;
+
+        if (!manualPlan || !idealPlan) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Manual plan e ideal plan são obrigatórios'
+            });
+        }
+
+        const recommendationService = require('./services/recommendation-service');
+        const efficiency = recommendationService.calculateEfficiency(manualPlan, idealPlan);
+
+        res.json(efficiency);
+
+    } catch (err) {
+        console.error('Erro ao calcular eficiência:', err);
+        res.status(500).json({
+            status: 'error',
+            error: 'Erro ao calcular eficiência',
+            message: err.message
+        });
+    }
+});
+
+/**
+ * POST /api/get-player-list
+ * NEW: Generate detailed player/format list based on manual adjustments
+ */
+app.post('/api/get-player-list', isAuthenticated, async (req, res) => {
+    try {
+        const { manualPlan, idealPlan } = req.body;
+
+        if (!manualPlan || !idealPlan) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Manual plan e ideal plan são obrigatórios'
+            });
+        }
+
+        const recommendationService = require('./services/recommendation-service');
+        const playerList = recommendationService.generatePlayerList(manualPlan, idealPlan);
+
+        res.json({
+            status: 'success',
+            playerList
+        });
+
+    } catch (err) {
+        console.error('Erro ao gerar lista de players:', err);
+        res.status(500).json({
+            status: 'error',
+            error: 'Erro ao gerar lista de players',
+            message: err.message
+        });
+    }
+});
+
+/**
  * POST /api/inventory
  * Retorna inventário filtrado (para tabela consolidada)
  */

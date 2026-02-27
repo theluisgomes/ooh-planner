@@ -250,6 +250,8 @@ class RecommendationService {
                             exibidores: face.exibidores,
                             formato: face.formato,
                             taxonomia: face.taxonomia,
+                            ranking: face.ranking || null,
+                            pesos: face.pesos || null,
                             idealQuantity: idealQty,           // NEW: Ideal recommendation
                             negotiatedQuantity: targetQty,     // NEW: Manual adjustment
                             discount: parseFloat(discountPercent), // NEW: Discount %

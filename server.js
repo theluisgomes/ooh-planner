@@ -352,6 +352,126 @@ app.post('/api/get-player-list', isAuthenticated, async (req, res) => {
 });
 
 /**
+ * POST /api/get-planning-data
+ * Returns inventory grouped by exibidor+formato for the planning table
+ */
+app.post('/api/get-planning-data', isAuthenticated, async (req, res) => {
+    try {
+        const { taxonomia, praca, formato, exibidores } = req.body;
+
+        if (!taxonomia || !praca) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Taxonomia e Praça são obrigatórios'
+            });
+        }
+
+        // Get filtered inventory
+        const filters = { taxonomia, praca };
+        if (formato) filters.formato = formato;
+        if (exibidores) filters.exibidores = exibidores;
+        const inventory = await dataService.getInventory(filters);
+
+        if (!inventory || inventory.length === 0) {
+            return res.json({
+                status: 'success',
+                rows: [],
+                message: 'Nenhum inventário encontrado'
+            });
+        }
+
+        // Group by exibidores + formato
+        const groups = {};
+        inventory.forEach(item => {
+            const key = `${item.exibidores}|||${item.formato}`;
+            if (!groups[key]) {
+                groups[key] = {
+                    exibidores: item.exibidores,
+                    formato: item.formato,
+                    ranking: item.ranking,
+                    pesos: item.pesos,
+                    digital: 0,
+                    estatico: 0,
+                    totalFaces: 0,
+                    s1: 0,
+                    s2: 0,
+                    s3: 0,
+                    s4: 0,
+                    unitario_bruto_tabela: 0,
+                    desconto: 0,
+                    unitario_bruto_negociado: 0,
+                    total_bruto_negociado: 0,
+                    exposicao_unit: 0,
+                    impacto_unit: 0,
+                    count: 0
+                };
+            }
+            const g = groups[key];
+            g.totalFaces += (item.quantidade || 0);
+            g.s1 += (item.s1 || 0);
+            g.s2 += (item.s2 || 0);
+            g.s3 += (item.s3 || 0);
+            g.s4 += (item.s4 || 0);
+            g.digital = Math.max(g.digital, item.digital || 0);
+            g.estatico = Math.max(g.estatico, item.estatico || 0);
+            g.unitario_bruto_tabela += (item.unitario_bruto_tabela || 0);
+            g.desconto += (item.desconto || 0);
+            g.unitario_bruto_negociado += (item.unitario_bruto_negociado || 0);
+            g.total_bruto_negociado += (item.total_bruto_negociado || 0);
+            g.exposicao_unit += (item.exposicao_unit || 0);
+            g.impacto_unit += (item.impacto_unit || 0);
+            g.count++;
+        });
+
+        // Convert to array and compute averages
+        const rows = Object.values(groups).map(g => {
+            const avgTabela = g.count > 0 ? g.unitario_bruto_tabela / g.count : 0;
+            const avgDesconto = g.count > 0 ? g.desconto / g.count : 0;
+            const avgNegociado = g.count > 0 ? g.unitario_bruto_negociado / g.count : 0;
+            const index = g.totalFaces * (g.pesos || 0.5);
+
+            return {
+                exibidores: g.exibidores,
+                formato: g.formato,
+                ranking: g.ranking,
+                pesos: g.pesos,
+                totalFaces: g.totalFaces,
+                index: Math.round(index * 100) / 100,
+                digital: g.digital,
+                estatico: g.estatico,
+                s1: g.s1,
+                s2: g.s2,
+                s3: g.s3,
+                s4: g.s4,
+                unitario_bruto_tabela: Math.round(avgTabela * 100) / 100,
+                desconto: Math.round(avgDesconto * 100) / 100,
+                unitario_bruto_negociado: Math.round(avgNegociado * 100) / 100,
+                total_bruto_negociado: Math.round(g.total_bruto_negociado * 100) / 100,
+                exposicao_unit: g.exposicao_unit,
+                impacto_unit: g.impacto_unit
+            };
+        });
+
+        // Sort by ranking (lower = higher priority)
+        rows.sort((a, b) => (a.ranking || 99) - (b.ranking || 99));
+
+        res.json({
+            status: 'success',
+            rows,
+            totalRows: rows.length,
+            totalFaces: rows.reduce((s, r) => s + r.totalFaces, 0)
+        });
+
+    } catch (err) {
+        console.error('Erro ao buscar planning data:', err);
+        res.status(500).json({
+            status: 'error',
+            message: err.message
+        });
+    }
+});
+
+/**
  * POST /api/inventory
  * Retorna inventário filtrado (para tabela consolidada)
  */

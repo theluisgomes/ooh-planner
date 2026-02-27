@@ -9,10 +9,15 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 
 <body>
-    <!-- Header com Total Global -->
+    <!-- Header -->
     <header class="header">
         <div class="container">
             <div class="header-content">
@@ -25,17 +30,11 @@
                     </div>
                 </div>
 
-                <!-- Buttons removed as per request -->
-                <!-- <div class="header-actions">
-                    <button class="btn btn-secondary" id="btnConfig">
-                        ⚙️ CONFIG
-                    </button>
-                    <button class="btn btn-primary" id="btnStore">
-                        💾 STORE ON BIGQUERY
-                    </button>
-                </div> -->
-
                 <div class="header-actions">
+                    <button class="btn btn-secondary" id="btnHelp"
+                        style="padding: 0.5rem 1rem; font-size: 0.875rem; margin-right: 0.5rem;">
+                        ❓ Guia Rápido
+                    </button>
                     <a href="history.html" class="btn btn-secondary"
                         style="padding: 0.5rem 1rem; font-size: 0.875rem; margin-right: 0.5rem; text-decoration: none; display: inline-flex; align-items: center;">
                         📜 Histórico
@@ -47,8 +46,6 @@
                     <button class="btn btn-secondary" id="btnLogout" style="padding: 0.5rem 1rem; font-size: 0.875rem;">
                         🚪 Sair
                     </button>
-                    <!-- <button class="btn btn-secondary" id="btnConfig">⚙️ CONFIG</button> -->
-                    <!-- <button class="btn btn-primary" id="btnStore">💾 STORE ON BIGQUERY</button> -->
                 </div>
 
                 <div class="total-card">
@@ -63,7 +60,7 @@
     <main class="main-content">
         <div class="container">
             <div id="mediaBlocks" class="media-blocks-grid">
-                <!-- Os blocos serão gerados dinamicamente via JS -->
+                <!-- Blocos gerados dinamicamente -->
             </div>
 
             <div class="actions-bar" style="text-align: center; margin: 2rem 0;">
@@ -74,6 +71,71 @@
         </div>
     </main>
 
+    <!-- Global Analytics Dashboard -->
+    <section id="globalDashboard" style="display: none;">
+        <div class="container">
+            <div class="charts-section">
+                <h4 class="section-title">📊 Análise Global / Share</h4>
+
+                <!-- KPI stat cards -->
+                <div class="kpi-cards-row">
+                    <div class="kpi-card accent-blue">
+                        <span class="kpi-card-label">Total de Faces</span>
+                        <span class="kpi-card-value" id="gKpiFaces">--</span>
+                        <span class="kpi-card-sub">faces negociadas</span>
+                    </div>
+                    <div class="kpi-card accent-green">
+                        <span class="kpi-card-label">Investimento Total</span>
+                        <span class="kpi-card-value" id="gKpiInvest">--</span>
+                        <span class="kpi-card-sub">custo negociado</span>
+                    </div>
+                    <div class="kpi-card accent-teal">
+                        <span class="kpi-card-label">CPF Médio</span>
+                        <span class="kpi-card-value" id="gKpiCpf">--</span>
+                        <span class="kpi-card-sub">custo por face</span>
+                    </div>
+                    <div class="kpi-card accent-purple">
+                        <span class="kpi-card-label">Recortes Ativos</span>
+                        <span class="kpi-card-value" id="gKpiRecortes">--</span>
+                        <span class="kpi-card-sub">blocos de mídia</span>
+                    </div>
+                </div>
+
+                <!-- charts row: donut + donut + bar -->
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <span class="chart-card-title">Share por Formato</span>
+                        <div class="chart-canvas-wrap">
+                            <canvas id="gChartFormato"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <span class="chart-card-title">Share por Exibidor</span>
+                        <div class="chart-canvas-wrap">
+                            <canvas id="gChartExibidor"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <span class="chart-card-title">Investimento por Formato (R$)</span>
+                        <div class="chart-canvas-wrap">
+                            <canvas id="gChartBarFormato"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Mapa Geográfico -->
+    <section class="map-section" id="mapSection" style="display: none;">
+        <div class="container">
+            <div class="section-header">
+                <h2>🗺️ Distribuição Geográfica</h2>
+            </div>
+            <div id="mapContainer" style="height: 400px; border-radius: 12px; overflow: hidden;"></div>
+        </div>
+    </section>
+
     <!-- Tabela Consolidada -->
     <section class="consolidated-section">
         <div class="container">
@@ -81,7 +143,6 @@
                 <h2>📋 Tabela Consolidada</h2>
                 <div class="section-actions">
                     <button class="btn btn-secondary" id="btnResetAll">🔄 Reset Tudo</button>
-                    <button class="btn btn-primary" id="btnStore">💾 Store on BigQuery</button>
                     <button class="btn btn-primary" id="btnExport">📥 Exportar CSV</button>
                 </div>
             </div>
@@ -91,22 +152,18 @@
                     <thead>
                         <tr>
                             <th>Mídia</th>
-                            <th>UF</th>
                             <th>Praça</th>
                             <th>Taxonomia</th>
-                            <th>Exibidores</th>
-                            <th>Formato</th>
-                            <th>Faces</th>
-                            <th>Budget Input</th>
-                            <th>Budget Usado</th>
-                            <th>Ideal</th>
-                            <th>Sobrando</th>
+                            <th>Budget</th>
+                            <th>Formatos</th>
+                            <th>TT Faces</th>
+                            <th>Budget Ideal</th>
                             <th>Status</th>
                         </tr>
                     </thead>
                     <tbody id="consolidatedTableBody">
                         <tr class="empty-state">
-                            <td colspan="12">Nenhuma mídia configurada ainda</td>
+                            <td colspan="8">Nenhuma mídia configurada ainda</td>
                         </tr>
                     </tbody>
                 </table>
@@ -119,10 +176,10 @@
         <div class="media-block">
             <div class="media-block-header">
                 <div class="media-number">
-                    <span class="number-badge">2</span>
+                    <span class="number-badge">1</span>
                     <div>
                         <h3>RECORTE DE MÍDIA</h3>
-                        <p class="config-label">CONFIGURAÇÃO TÉCNICA #02</p>
+                        <p class="config-label">CONFIGURAÇÃO TÉCNICA #01</p>
                     </div>
                 </div>
                 <div class="media-status">
@@ -132,27 +189,14 @@
             </div>
 
             <div class="media-block-content">
-                <!-- CORE INPUTS (4 campos principais) -->
+                <!-- CORE INPUTS -->
                 <div class="core-inputs-section">
                     <h4 class="section-title">📝 Parâmetros Principais</h4>
                     <div class="core-inputs-grid">
                         <div class="form-group">
-                            <label>💰 BUDGET TOTAL (R$)</label>
-                            <input type="number" class="form-control input-budget" placeholder="Ex: 50000" min="0"
+                            <label>💰 BUDGET (R$)</label>
+                            <input type="number" class="form-control input-budget" placeholder="Ex: 100000" min="0"
                                 step="1000">
-                        </div>
-
-                        <div class="form-group">
-                            <label>📅 CICLO (semanas)</label>
-                            <input type="number" class="form-control input-campaign-cycle" placeholder="Ex: 4" min="1"
-                                step="1">
-                        </div>
-
-                        <div class="form-group">
-                            <label>🏷️ TAXONOMIA</label>
-                            <select class="form-control input-taxonomia">
-                                <option value="">Selecione...</option>
-                            </select>
                         </div>
 
                         <div class="form-group">
@@ -161,143 +205,146 @@
                                 <option value="">Selecione...</option>
                             </select>
                         </div>
+
+                        <div class="form-group">
+                            <label>🏷️ TAXONOMIA</label>
+                            <select class="form-control input-taxonomia">
+                                <option value="">Selecione...</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
-                <!-- IDEAL PLAN RECOMMENDATION (auto-generated) -->
-                <div class="ideal-plan-section" style="display: none;">
-                    <h4 class="section-title">💡 Plano Ideal Recomendado</h4>
-                    <div class="ideal-plan-summary">
-                        <div class="ideal-metric">
-                            <span class="metric-label">Total de Faces:</span>
-                            <span class="metric-value ideal-total-faces">--</span>
-                        </div>
-                        <div class="ideal-metric">
-                            <span class="metric-label">Custo Total:</span>
-                            <span class="metric-value ideal-total-cost">--</span>
-                        </div>
-                        <div class="ideal-metric">
-                            <span class="metric-label">Exposição:</span>
-                            <span class="metric-value ideal-total-exposure">--</span>
-                        </div>
-                    </div>
-                    <div class="ideal-formats-grid">
-                        <!-- Populated dynamically with format cards -->
+                <!-- PLANNING TABLE -->
+                <div class="planning-section" style="display: none;">
+                    <h4 class="section-title">📊 PLANEJAMENTO</h4>
+                    <div class="planning-table-wrapper">
+                        <table class="planning-table">
+                            <thead>
+                                <tr class="planning-header-main">
+                                    <th rowspan="2">VEÍCULO</th>
+                                    <th rowspan="2">FORMATO</th>
+                                    <th rowspan="2">TT FACES</th>
+                                    <th rowspan="2">INDEX</th>
+                                    <th rowspan="2" colspan="2">TIPO MATERIAL</th>
+                                    <th colspan="4" class="weeks-header">SEMANAS</th>
+                                    <th rowspan="2">TABELA UNIT.</th>
+                                    <th rowspan="2">TOTAL LINHA</th>
+                                    <th rowspan="2">NEGOCIAÇÃO</th>
+                                    <th rowspan="2">TT NEG.</th>
+                                    <th rowspan="2">BUDGET IDEAL</th>
+                                    <th rowspan="2">CUSTO/FACE</th>
+                                    <th rowspan="2">OBS</th>
+                                </tr>
+                                <tr class="planning-header-weeks">
+                                    <th>S1</th>
+                                    <th>S2</th>
+                                    <th>S3</th>
+                                    <th>S4</th>
+                                </tr>
+                            </thead>
+                            <tbody class="planning-body">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                            <tfoot>
+                                <tr class="planning-totals">
+                                    <td colspan="2"><strong>TOTAIS</strong></td>
+                                    <td class="total-faces">--</td>
+                                    <td class="total-index">--</td>
+                                    <td colspan="2"></td>
+                                    <td class="total-s1">--</td>
+                                    <td class="total-s2">--</td>
+                                    <td class="total-s3">--</td>
+                                    <td class="total-s4">--</td>
+                                    <td class="total-tabela">--</td>
+                                    <td class="total-linha">--</td>
+                                    <td></td>
+                                    <td class="total-neg">--</td>
+                                    <td class="total-budget-ideal">--</td>
+                                    <td class="total-custo-face">--</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
                     </div>
                 </div>
 
-                <!-- MANUAL ADJUSTMENT SECTION -->
-                <div class="manual-adjustment-section" style="display: none;">
-                    <h4 class="section-title">✏️ Ajuste Manual (Realidade de Negociação)</h4>
-                    <p class="section-description">Ajuste as quantidades conforme a disponibilidade real do fornecedor
-                    </p>
-                    <div class="manual-adjustment-grid">
-                        <!-- Populated dynamically with editable inputs -->
-                    </div>
-                    <button class="btn btn-primary btn-generate-list" style="margin-top: 1rem;">
-                        📋 Gerar Lista de Players
-                    </button>
-                </div>
-
-                <!-- EFFICIENCY INDICATORS -->
-                <div class="efficiency-section" style="display: none;">
-                    <h4 class="section-title">📊 Análise de Eficiência</h4>
-
-                    <!-- Comparison Cards -->
-                    <div class="efficiency-comparison">
-                        <div class="efficiency-card">
-                            <div class="efficiency-label">Plano Ideal</div>
-                            <div class="efficiency-value ideal-efficiency-value">--</div>
-                            <div class="efficiency-sublabel">exposições/R$</div>
-                        </div>
-                        <div class="efficiency-arrow">→</div>
-                        <div class="efficiency-card">
-                            <div class="efficiency-label">Plano Ajustado</div>
-                            <div class="efficiency-value manual-efficiency-value">--</div>
-                            <div class="efficiency-sublabel">exposições/R$</div>
-                        </div>
-                    </div>
-
-                    <!-- Efficiency Sliders -->
-                    <div class="efficiency-sliders-grid">
-                        <!-- Eficiência Líquida Slider -->
-                        <div class="slider-card">
-                            <div class="slider-header">
-                                <span class="slider-title">EFICIÊNCIA LÍQUIDA</span>
-                                <span class="slider-value ideal-efficiency-slider-value">--</span>
-                            </div>
-                            <div class="slider-track-container">
-                                <div class="slider-labels">
-                                    <span>INEFICIENTE</span>
-                                    <span>EFICIENTE</span>
-                                </div>
-                                <div class="slider-track">
-                                    <div class="slider-dashed-line"></div>
-                                    <div class="slider-cursor baseline" style="left: 50%;"></div>
-                                    <div class="slider-cursor current efficiency-cursor" style="left: 0%;"></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Índice de Exposição Slider -->
-                        <div class="slider-card">
-                            <div class="slider-header">
-                                <span class="slider-title">ÍNDICE DE EXPOSIÇÃO</span>
-                                <span class="slider-value exposure-slider-value">--</span>
-                            </div>
-                            <div class="slider-track-container">
-                                <div class="slider-labels">
-                                    <span>UNDER</span>
-                                    <span>OVER</span>
-                                </div>
+                <!-- EXPOSIÇÃO + EFICIÊNCIA GAUGES -->
+                <div class="gauges-section" style="display: none;">
+                    <div class="gauges-grid">
+                        <!-- EXPOSIÇÃO -->
+                        <div class="gauge-card">
+                            <h4 class="gauge-title">EXPOSIÇÃO</h4>
+                            <table class="gauge-table">
+                                <thead>
+                                    <tr>
+                                        <th>Min</th>
+                                        <th>Index</th>
+                                        <th>Max</th>
+                                        <th>Index</th>
+                                        <th>Median</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="exposure-table-body">
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                                <tfoot>
+                                    <tr class="gauge-totals">
+                                        <td class="exp-total-min">--</td>
+                                        <td></td>
+                                        <td class="exp-total-max">--</td>
+                                        <td></td>
+                                        <td class="exp-total-median">--</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                            <div class="gauge-slider-container">
+                                <div class="gauge-slider-value exp-gauge-value">--</div>
                                 <div class="slider-track">
                                     <div class="slider-dashed-line"></div>
                                     <div class="slider-cursor baseline" style="left: 50%;"></div>
                                     <div class="slider-cursor current exposure-cursor" style="left: 0%;"></div>
                                 </div>
+                                <div class="slider-labels">
+                                    <span>UNDER</span>
+                                    <span>OVER</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Status Bar -->
-                    <div class="efficiency-status-bar">
-                        <div class="efficiency-bar">
-                            <div class="efficiency-fill" style="width: 0%"></div>
+                        <!-- EFICIÊNCIA R$ -->
+                        <div class="gauge-card">
+                            <h4 class="gauge-title">EFICIÊNCIA R$</h4>
+                            <table class="gauge-table">
+                                <thead>
+                                    <tr>
+                                        <th>CPF MIN</th>
+                                        <th>CPF MAX</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="efficiency-table-body">
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                                <tfoot>
+                                    <tr class="gauge-totals">
+                                        <td class="eff-total-min">--</td>
+                                        <td class="eff-total-max">--</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                            <div class="gauge-slider-container">
+                                <div class="gauge-slider-value eff-gauge-value">--</div>
+                                <div class="slider-track">
+                                    <div class="slider-dashed-line"></div>
+                                    <div class="slider-cursor baseline" style="left: 50%;"></div>
+                                    <div class="slider-cursor current efficiency-cursor" style="left: 0%;"></div>
+                                </div>
+                                <div class="slider-labels">
+                                    <span>INEFICIENTE</span>
+                                    <span>EFICIENTE</span>
+                                </div>
+                            </div>
                         </div>
-                        <div class="efficiency-status">--</div>
-                    </div>
-                </div>
-
-                <!-- PLAYER LIST (final output) -->
-                <div class="player-list-section" style="display: none;">
-                    <div
-                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h4 class="section-title" style="margin: 0;">📋 Lista de Players e Formatos</h4>
-                        <button class="btn btn-secondary btn-export-csv" style="font-size: 0.875rem;">
-                            📥 Exportar CSV
-                        </button>
-                    </div>
-                    <div class="player-table-wrapper">
-                        <table class="player-table">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Praça</th>
-                                    <th>UF</th>
-                                    <th>Exibidores</th>
-                                    <th>Formato</th>
-                                    <th>Qtd Ideal</th>
-                                    <th>Qtd Negociada</th>
-                                    <th>Desconto %</th>
-                                    <th>Preço Un.</th>
-                                    <th>Total</th>
-                                    <th>ROI</th>
-                                </tr>
-                            </thead>
-                            <tbody class="player-list-body">
-                                <!-- Populated dynamically -->
-                            </tbody>
-                        </table>
                     </div>
                 </div>
 
@@ -306,6 +353,53 @@
             </div>
         </div>
     </template>
+
+    <!-- Help Modal -->
+    <div class="modal-overlay" id="helpModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>❓ Guia Rápido de Uso</h2>
+                <button class="modal-close" id="helpModalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <h3>1. Configure o recorte de mídia</h3>
+                <p>Preencha os três parâmetros do bloco na seguinte ordem:</p>
+                <ul>
+                    <li><strong>Budget (R$):</strong> defina o orçamento disponível para o recorte.</li>
+                    <li><strong>Praça:</strong> selecione a cidade ou região do plano.</li>
+                    <li><strong>Taxonomia:</strong> escolha o tipo de produto/campanha.</li>
+                </ul>
+                <p>Ao preencher os três campos, o planejamento será carregado automaticamente.</p>
+
+                <h3>2. Ajuste as quantidades (S1–S4)</h3>
+                <p>Na tabela de planejamento, preencha as quantidades de faces por semana.
+                    Cada campo mostra o <strong>máximo permitido</strong> (total de faces disponíveis).</p>
+                <p>⚠️ Se o valor digitado ultrapassar o máximo, o campo ficará destacado em vermelho como alerta.</p>
+
+                <h3>3. Interprete os resultados</h3>
+                <ul>
+                    <li><strong>Indicadores (gauges):</strong> exposição e eficiência orçamentária em tempo real.</li>
+                    <li><strong>Gráficos de share:</strong> distribuição do investimento por formato e por exibidor.
+                    </li>
+                    <li><strong>Mapa geográfico:</strong> visualize a distribuição do investimento por praça.</li>
+                    <li><strong>Tabela consolidada:</strong> resumo geral com todas as mídias configuradas.</li>
+                </ul>
+
+                <h3>4. Exporte e compartilhe</h3>
+                <p>Use o botão <strong>Exportar CSV</strong> para baixar a tabela e usar como base para decks ou
+                    negociações.</p>
+                <p>Para salvar o plano completo, use o botão <strong>Salvar Plano</strong> no cabeçalho.</p>
+
+                <h3>💡 Boas práticas</h3>
+                <ul>
+                    <li>Sempre preencha Budget, Praça e Taxonomia antes de editar quantidades.</li>
+                    <li>Use "+ ADICIONAR RECORTE DE MÍDIA" para comparar cenários lado a lado.</li>
+                    <li>Se um alerta aparecer, avalie o ajuste de ambição — não é um bug.</li>
+                    <li>Consulte o mapa e os gráficos para validar a distribuição do investimento.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
 
     <script src="js/app.js"></script>
     <script>

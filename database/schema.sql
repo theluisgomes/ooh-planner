@@ -24,6 +24,8 @@ CREATE TABLE inventory (
     s4 INTEGER DEFAULT 0,
     flight INTEGER DEFAULT 1,
     unitario_bruto_tabela REAL NOT NULL,
+    ranking INTEGER,
+    pesos REAL,
     desconto REAL DEFAULT 0,
     unitario_bruto_negociado REAL,
     total_bruto_negociado REAL,
@@ -43,3 +45,4 @@ CREATE INDEX idx_estatico ON inventory(estatico);
 
 -- Índice composto para filtros combinados
 CREATE INDEX idx_filters ON inventory(uf, praca, taxonomia, formato);
+CREATE INDEX idx_ranking ON inventory(ranking);

@@ -27,8 +27,14 @@ class BudgetOptimizer {
         // Digital bonus: digital formats may have higher engagement
         const digitalBonus = this.parseNumber(face.digital) === 1 ? 1.2 : 1.0;
 
-        // Combined ROI score
-        const roi = (priceEfficiency * 0.4 + quantityScore * 0.4) * formatMultiplier * digitalBonus;
+        // Peso from client ranking (1=0.9, 2=0.8, ... 12=0.02)
+        // Default to 0.5 if no peso data available
+        const peso = (face.pesos !== null && face.pesos !== undefined && face.pesos > 0)
+            ? face.pesos
+            : 0.5;
+
+        // Combined ROI score — peso acts as primary weighting factor
+        const roi = (priceEfficiency * 0.4 + quantityScore * 0.4) * formatMultiplier * digitalBonus * peso;
 
         return roi;
     }
@@ -136,6 +142,8 @@ class BudgetOptimizer {
                     taxonomia: face.taxonomia,
                     digital: face.digital,
                     estatico: face.estatico,
+                    ranking: face.ranking || null,
+                    pesos: face.pesos || null,
                     quantity: minQuantity,
                     unitPrice: unitPrice,
                     totalCost: faceCost,

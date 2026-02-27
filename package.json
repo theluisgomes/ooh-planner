@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "import": "node database/import.js",
+    "import-excel": "node database/import-excel.js",
     "dev": "nodemon server.js"
   },
   "keywords": [
@@ -24,7 +25,8 @@
     "csv-parser": "^3.0.0",
     "dotenv": "^17.2.3",
     "express": "^4.18.2",
-    "express-session": "^1.19.0"
+    "express-session": "^1.19.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

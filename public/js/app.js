@@ -497,22 +497,22 @@ function renderPlanningTableBody(blockId) {
 
         // Inline input events for S1-S4 weeks with min/max validation
         tr.querySelectorAll('.input-s1, .input-s2, .input-s3, .input-s4').forEach(input => {
-            const validateRange = (e) => {
-                const val = parseInt(e.target.value) || 0;
-                const max = parseInt(e.target.max) || Infinity;
+            const validateRange = (el) => {
+                const val = parseInt(el.value) || 0;
+                const max = parseInt(el.max) || Infinity;
                 if (val > max) {
-                    e.target.classList.add('input-over-range');
-                    e.target.title = `⚠️ Acima do máximo permitido (${max} faces)`;
+                    el.classList.add('input-over-range');
+                    el.title = `⚠️ Acima do máximo permitido (${max} faces)`;
                 } else {
-                    e.target.classList.remove('input-over-range');
-                    e.target.title = '';
+                    el.classList.remove('input-over-range');
+                    el.title = '';
                 }
             };
             input.addEventListener('change', (e) => {
                 const rowIdx = parseInt(e.target.dataset.row);
                 const field = e.target.dataset.field;
                 block.planningRows[rowIdx][field] = parseInt(e.target.value) || 0;
-                validateRange(e);
+                validateRange(e.target);
                 recalculatePlanningRows(block);
                 updatePlanningTotals(blockId);
                 updateGauges(blockId);
@@ -522,12 +522,15 @@ function renderPlanningTableBody(blockId) {
                 const rowIdx = parseInt(e.target.dataset.row);
                 const field = e.target.dataset.field;
                 block.planningRows[rowIdx][field] = parseInt(e.target.value) || 0;
-                validateRange(e);
+                validateRange(e.target);
                 recalculatePlanningRows(block);
                 updatePlanningTotals(blockId);
                 updateGauges(blockId);
             });
+            // Validate immediately on render (catches pre-filled over-limit values)
+            validateRange(input);
         });
+
 
         tr.querySelector('.input-neg').addEventListener('change', (e) => {
             const rowIdx = parseInt(e.target.dataset.row);
@@ -599,8 +602,6 @@ function updateGauges(blockId) {
 
 function updateExposureGauge(block, blockElement) {
     const rows = block.planningRows;
-    const expBody = blockElement.querySelector('.exposure-table-body');
-    expBody.innerHTML = '';
 
     let totalMin = 0, totalMax = 0, totalMedian = 0;
 
@@ -620,16 +621,6 @@ function updateExposureGauge(block, blockElement) {
         totalMin += minIndex;
         totalMax += maxIndex;
         totalMedian += median;
-
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${min}</td>
-            <td>${minIndex.toFixed(1)}</td>
-            <td>${max}</td>
-            <td>${maxIndex.toFixed(1)}</td>
-            <td>${median}</td>
-        `;
-        expBody.appendChild(tr);
     });
 
     blockElement.querySelector('.exp-total-min').textContent = totalMin.toFixed(1);
@@ -659,63 +650,67 @@ function updateExposureGauge(block, blockElement) {
 
 function updateEfficiencyGauge(block, blockElement) {
     const rows = block.planningRows;
-    const effBody = blockElement.querySelector('.efficiency-table-body');
-    effBody.innerHTML = '';
 
     let totalCpfMin = 0, totalCpfMax = 0;
 
     rows.forEach(row => {
-        const cpfMin = row.ttNeg;  // negotiated cost per face (best price)
-        const cpfMax = row.unitario_bruto_tabela;  // full table price per face
+        if (!row.facesUsadas || row.facesUsadas === 0) return;
 
-        totalCpfMin += cpfMin;
-        totalCpfMax += cpfMax;
-
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${formatNumber(cpfMin)}</td>
-            <td>${formatNumber(cpfMax)}</td>
-        `;
-        effBody.appendChild(tr);
+        totalCpfMin += row.custoFace || 0;
+        totalCpfMax += row.unitario_bruto_tabela || 0;
     });
 
     blockElement.querySelector('.eff-total-min').textContent = formatNumber(totalCpfMin);
     blockElement.querySelector('.eff-total-max').textContent = formatNumber(totalCpfMax);
 
-    // Efficiency gauge: total negotiated cost vs. budget
+    // Efficiency gauge: measures the savings obtained via negotiation
+    // ratio = totalNeg / totalTabela → 1 means 0% discount, 0.5 means 50% discount
     const budget = block.budget || 0;
-    const totalCost = rows.reduce((s, r) => s + r.ttNeg, 0);
+    const totalNeg = rows.reduce((s, r) => s + r.ttNeg, 0);
+    const totalTabela = rows.reduce((s, r) => s + r.totalLinha, 0);
 
-    // Budget utilization: how much of budget is consumed
-    // 0% = no spend, 50% = baseline (ideal), 100% = overspent
+    // Savings percentage: how much cheaper the negotiated price is vs table price
+    const savingsRatio = totalTabela > 0 ? 1 - (totalNeg / totalTabela) : 0;  // 0 to 1
+    const overBudget = totalNeg > budget && budget > 0;
+
+    // Cursor position: 0% savings → 50% (baseline, center), 100% savings → 98% (right)
+    // If over budget, push left: the more over, the further left
     let effPercent;
-    if (budget > 0) {
-        const ratio = totalCost / budget;
-        // Map: ratio 0 → 5%, ratio 1 → 50% (baseline), ratio 2 → 95%
-        effPercent = Math.min(Math.max(ratio * 50, 2), 98);
+    if (overBudget) {
+        // Over-budget: cursor goes left of baseline
+        const overRatio = budget > 0 ? totalNeg / budget : 2;  // how many times over budget
+        effPercent = Math.max(50 - (overRatio - 1) * 50, 2);   // 1× = 50%, 2× = 0%
     } else {
-        effPercent = 2;
+        // Within budget: cursor from baseline (50%) to right based on savings
+        effPercent = 50 + savingsRatio * 48;  // 0% savings = 50%, 50% savings = 74%
     }
+    effPercent = Math.min(Math.max(effPercent, 2), 98);
 
-    const remaining = budget - totalCost;
-    const remainingLabel = remaining >= 0
-        ? `${formatCurrency(totalCost)} de ${formatCurrency(budget)} (sobra ${formatCurrency(remaining)})`
-        : `${formatCurrency(totalCost)} de ${formatCurrency(budget)} (⚠️ acima ${formatCurrency(Math.abs(remaining))})`;
+    // Label: show cost vs budget + savings percentage
+    const remaining = budget - totalNeg;
+    const savingsPctText = (savingsRatio * 100).toFixed(0);
+    let remainingLabel;
+    if (overBudget) {
+        remainingLabel = `${formatCurrency(totalNeg)} de ${formatCurrency(budget)} (⚠️ acima ${formatCurrency(Math.abs(remaining))})`;
+    } else if (savingsRatio > 0) {
+        remainingLabel = `${formatCurrency(totalNeg)} de ${formatCurrency(budget)} (💰 ${savingsPctText}% economia)`;
+    } else {
+        remainingLabel = `${formatCurrency(totalNeg)} de ${formatCurrency(budget)} (sobra ${formatCurrency(remaining)})`;
+    }
 
     blockElement.querySelector('.eff-gauge-value').textContent = remainingLabel;
     const effCursor = blockElement.querySelector('.efficiency-cursor');
     effCursor.style.left = `${effPercent}%`;
 
     // Color feedback
-    const ratio = budget > 0 ? totalCost / budget : 0;
-    if (ratio <= 1 && ratio > 0.5) {
-        effCursor.style.backgroundColor = '#10B981'; // green - good use of budget
-    } else if (ratio <= 0.5 && ratio > 0) {
-        effCursor.style.backgroundColor = '#F59E0B'; // yellow - under-utilizing
-    } else if (ratio > 1) {
+    if (overBudget) {
         effCursor.style.backgroundColor = '#EF4444'; // red - over budget
+    } else if (savingsRatio >= 0.15) {
+        effCursor.style.backgroundColor = '#10B981'; // green - strong negotiation
+    } else if (savingsRatio > 0) {
+        effCursor.style.backgroundColor = '#F59E0B'; // yellow - some savings
     } else {
-        effCursor.style.backgroundColor = '#94A3B8'; // gray - no data
+        effCursor.style.backgroundColor = '#94A3B8'; // gray - no discount
     }
 }
 

@@ -607,6 +607,36 @@ select.form-control {
     border-bottom: 2px solid var(--primary);
 }
 
+.gauge-scores {
+    display: flex;
+    justify-content: center;
+    gap: var(--spacing-lg);
+    padding: var(--spacing-md) 0;
+    margin-bottom: var(--spacing-sm);
+}
+
+.gauge-score {
+    text-align: center;
+    cursor: help;
+}
+
+.gauge-score-label {
+    display: block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.gauge-score-value {
+    display: block;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
 .gauge-table {
     width: 100%;
     border-collapse: collapse;
@@ -1114,4 +1144,93 @@ select.form-control {
     .modal-content {
         width: 95%;
     }
+}
+
+/* ============================================
+   OVER-RANGE INPUT VALIDATION
+   ============================================ */
+@keyframes shake-x {
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    25% {
+        transform: translateX(-3px);
+    }
+
+    75% {
+        transform: translateX(3px);
+    }
+}
+
+.input-over-range {
+    border: 2px solid #EF4444 !important;
+    background-color: #FEF2F2 !important;
+    color: #B91C1C !important;
+    animation: shake-x 0.3s ease;
+    outline: none;
+}
+
+.input-over-range:focus {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25) !important;
+}
+
+
+
+/* ============================================
+   CUSTOM TOOLTIPS  [data-tooltip]
+   ============================================ */
+[data-tooltip] {
+    position: relative;
+    cursor: help;
+}
+
+[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1E293B;
+    color: #F8FAFC;
+    font-size: 0.72rem;
+    font-weight: 400;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    max-width: 240px;
+    width: max-content;
+    padding: 0.45rem 0.7rem;
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    transform: translateX(-50%) translateY(4px);
+    z-index: 9999;
+}
+
+[data-tooltip]:hover::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* Arrow below the tooltip box */
+[data-tooltip]::before {
+    content: '';
+    position: absolute;
+    bottom: calc(100% + 2px);
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: #1E293B;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.18s ease;
+    z-index: 9999;
+}
+
+[data-tooltip]:hover::before {
+    opacity: 1;
 }

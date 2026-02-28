@@ -80,22 +80,30 @@
                 <!-- KPI stat cards -->
                 <div class="kpi-cards-row">
                     <div class="kpi-card accent-blue">
-                        <span class="kpi-card-label">Total de Faces</span>
+                        <span class="kpi-card-label"
+                            data-tooltip="Soma de todas as faces negociadas em todos os recortes ativos">Total de
+                            Faces</span>
                         <span class="kpi-card-value" id="gKpiFaces">--</span>
                         <span class="kpi-card-sub">faces negociadas</span>
                     </div>
                     <div class="kpi-card accent-green">
-                        <span class="kpi-card-label">Investimento Total</span>
+                        <span class="kpi-card-label"
+                            data-tooltip="Soma do custo total negociado (TT NEG.) em todos os recortes ativos">Investimento
+                            Total</span>
                         <span class="kpi-card-value" id="gKpiInvest">--</span>
                         <span class="kpi-card-sub">custo negociado</span>
                     </div>
                     <div class="kpi-card accent-teal">
-                        <span class="kpi-card-label">CPF Médio</span>
+                        <span class="kpi-card-label"
+                            data-tooltip="Investimento Total ÷ Total de Faces. Indica o custo médio por cada face contratada no plano">CPF
+                            Médio</span>
                         <span class="kpi-card-value" id="gKpiCpf">--</span>
                         <span class="kpi-card-sub">custo por face</span>
                     </div>
                     <div class="kpi-card accent-purple">
-                        <span class="kpi-card-label">Recortes Ativos</span>
+                        <span class="kpi-card-label"
+                            data-tooltip="Número de recortes de mídia ativos (com praça, taxonomia e budget configurados)">Recortes
+                            Ativos</span>
                         <span class="kpi-card-value" id="gKpiRecortes">--</span>
                         <span class="kpi-card-sub">blocos de mídia</span>
                     </div>
@@ -224,16 +232,30 @@
                                 <tr class="planning-header-main">
                                     <th rowspan="2">VEÍCULO</th>
                                     <th rowspan="2">FORMATO</th>
-                                    <th rowspan="2">TT FACES</th>
-                                    <th rowspan="2">INDEX</th>
+                                    <th rowspan="2"
+                                        data-tooltip="Total de faces disponíveis no veículo (inventário máximo)">TT
+                                        FACES</th>
+                                    <th rowspan="2"
+                                        data-tooltip="Score ponderado do veículo baseado nos pesos estratégicos da campanha">
+                                        INDEX</th>
                                     <th rowspan="2" colspan="2">TIPO MATERIAL</th>
                                     <th colspan="4" class="weeks-header">SEMANAS</th>
-                                    <th rowspan="2">TABELA UNIT.</th>
-                                    <th rowspan="2">TOTAL LINHA</th>
-                                    <th rowspan="2">NEGOCIAÇÃO</th>
-                                    <th rowspan="2">TT NEG.</th>
-                                    <th rowspan="2">BUDGET IDEAL</th>
-                                    <th rowspan="2">CUSTO/FACE</th>
+                                    <th rowspan="2" data-tooltip="Preço de tabela por face (valor bruto sem desconto)">
+                                        TABELA UNIT.</th>
+                                    <th rowspan="2"
+                                        data-tooltip="Tabela unitária × faces usadas (custo bruto da linha)">TOTAL LINHA
+                                    </th>
+                                    <th rowspan="2" data-tooltip="% de desconto negociado sobre o preço de tabela">
+                                        NEGOCIAÇÃO</th>
+                                    <th rowspan="2"
+                                        data-tooltip="Custo total negociado da linha (após desconto × faces usadas)">TT
+                                        NEG.</th>
+                                    <th rowspan="2"
+                                        data-tooltip="Quanto do budget total seria ideal alocar para este veículo, proporcional ao seu peso no plano">
+                                        BUDGET IDEAL</th>
+                                    <th rowspan="2"
+                                        data-tooltip="Preço negociado por face individual (tabela × (1 − desconto))">
+                                        CUSTO/FACE</th>
                                     <th rowspan="2">OBS</th>
                                 </tr>
                                 <tr class="planning-header-weeks">
@@ -274,30 +296,25 @@
                     <div class="gauges-grid">
                         <!-- EXPOSIÇÃO -->
                         <div class="gauge-card">
-                            <h4 class="gauge-title">EXPOSIÇÃO</h4>
-                            <table class="gauge-table">
-                                <thead>
-                                    <tr>
-                                        <th>Min</th>
-                                        <th>Index</th>
-                                        <th>Max</th>
-                                        <th>Index</th>
-                                        <th>Median</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="exposure-table-body">
-                                    <!-- Populated dynamically -->
-                                </tbody>
-                                <tfoot>
-                                    <tr class="gauge-totals">
-                                        <td class="exp-total-min">--</td>
-                                        <td></td>
-                                        <td class="exp-total-max">--</td>
-                                        <td></td>
-                                        <td class="exp-total-median">--</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
+                            <h4 class="gauge-title"
+                                data-tooltip="Mede a cobertura de faces alocadas por semana vs. o máximo disponível. Quanto mais à direita, maior a exposição.">
+                                EXPOSIÇÃO</h4>
+                            <div class="gauge-scores">
+                                <div class="gauge-score"
+                                    data-tooltip="Menor número de faces alocadas entre as semanas S1–S4">
+                                    <span class="gauge-score-label">Min</span>
+                                    <span class="gauge-score-value exp-total-min">--</span>
+                                </div>
+                                <div class="gauge-score"
+                                    data-tooltip="Maior número de faces alocadas entre as semanas S1–S4">
+                                    <span class="gauge-score-label">Max</span>
+                                    <span class="gauge-score-value exp-total-max">--</span>
+                                </div>
+                                <div class="gauge-score" data-tooltip="Média de faces alocadas entre todas as semanas">
+                                    <span class="gauge-score-label">Median</span>
+                                    <span class="gauge-score-value exp-total-median">--</span>
+                                </div>
+                            </div>
                             <div class="gauge-slider-container">
                                 <div class="gauge-slider-value exp-gauge-value">--</div>
                                 <div class="slider-track">
@@ -314,24 +331,21 @@
 
                         <!-- EFICIÊNCIA R$ -->
                         <div class="gauge-card">
-                            <h4 class="gauge-title">EFICIÊNCIA R$</h4>
-                            <table class="gauge-table">
-                                <thead>
-                                    <tr>
-                                        <th>CPF MIN</th>
-                                        <th>CPF MAX</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="efficiency-table-body">
-                                    <!-- Populated dynamically -->
-                                </tbody>
-                                <tfoot>
-                                    <tr class="gauge-totals">
-                                        <td class="eff-total-min">--</td>
-                                        <td class="eff-total-max">--</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
+                            <h4 class="gauge-title"
+                                data-tooltip="Compara o custo por face negociado (MIN) com o preço de tabela (MAX). Quanto menor o MIN em relação ao MAX, melhor foi a negociação.">
+                                EFICIÊNCIA R$</h4>
+                            <div class="gauge-scores">
+                                <div class="gauge-score"
+                                    data-tooltip="Custo Por Face negociado — o que o cliente efetivamente paga por face após desconto">
+                                    <span class="gauge-score-label">CPF MIN</span>
+                                    <span class="gauge-score-value eff-total-min">--</span>
+                                </div>
+                                <div class="gauge-score"
+                                    data-tooltip="Custo Por Face de tabela — o preço público/bruto do veículo por face (benchmark de mercado)">
+                                    <span class="gauge-score-label">CPF MAX</span>
+                                    <span class="gauge-score-value eff-total-max">--</span>
+                                </div>
+                            </div>
                             <div class="gauge-slider-container">
                                 <div class="gauge-slider-value eff-gauge-value">--</div>
                                 <div class="slider-track">

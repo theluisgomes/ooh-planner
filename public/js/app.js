@@ -663,39 +663,47 @@ function updateEfficiencyGauge(block, blockElement) {
     blockElement.querySelector('.eff-total-min').textContent = formatNumber(totalCpfMin);
     blockElement.querySelector('.eff-total-max').textContent = formatNumber(totalCpfMax);
 
-    // Efficiency gauge: measures the savings obtained via negotiation
-    // ratio = totalNeg / totalTabela → 1 means 0% discount, 0.5 means 50% discount
+    // Efficiency gauge: composite of budget utilization + negotiation savings
     const budget = block.budget || 0;
     const totalNeg = rows.reduce((s, r) => s + r.ttNeg, 0);
     const totalTabela = rows.reduce((s, r) => s + r.totalLinha, 0);
 
-    // Savings percentage: how much cheaper the negotiated price is vs table price
-    const savingsRatio = totalTabela > 0 ? 1 - (totalNeg / totalTabela) : 0;  // 0 to 1
-    const overBudget = totalNeg > budget && budget > 0;
+    // Two efficiency dimensions:
+    // 1) Budget utilization: how much of the budget is being used (0 to 1+)
+    const budgetRatio = budget > 0 ? totalNeg / budget : 0;    // 0.9 = 90% used
+    const overBudget = budgetRatio > 1;
 
-    // Cursor position: 0% savings → 50% (baseline, center), 100% savings → 98% (right)
-    // If over budget, push left: the more over, the further left
+    // 2) Negotiation savings: how much cheaper vs table price (0 to 1)
+    const savingsRatio = totalTabela > 0 ? 1 - (totalNeg / totalTabela) : 0;
+
+    // Composite efficiency score (0 to 100):
+    // - Budget utilization contributes 60% (sweet spot at 80-100%)
+    // - Savings from negotiation contributes 40%
     let effPercent;
     if (overBudget) {
-        // Over-budget: cursor goes left of baseline
-        const overRatio = budget > 0 ? totalNeg / budget : 2;  // how many times over budget
-        effPercent = Math.max(50 - (overRatio - 1) * 50, 2);   // 1× = 50%, 2× = 0%
+        // Over budget → push left (penalty). 1× = 40%, 2× = 2%
+        effPercent = Math.max(40 - (budgetRatio - 1) * 40, 2);
+    } else if (budget > 0) {
+        // Within budget: utilization (capped at 100%) + savings bonus
+        const utilizationScore = Math.min(budgetRatio, 1) * 60;  // 0-60
+        const savingsScore = savingsRatio * 40;                    // 0-40
+        effPercent = utilizationScore + savingsScore;              // 0-100
     } else {
-        // Within budget: cursor from baseline (50%) to right based on savings
-        effPercent = 50 + savingsRatio * 48;  // 0% savings = 50%, 50% savings = 74%
+        effPercent = 2;
     }
     effPercent = Math.min(Math.max(effPercent, 2), 98);
 
-    // Label: show cost vs budget + savings percentage
+    // Label
     const remaining = budget - totalNeg;
     const savingsPctText = (savingsRatio * 100).toFixed(0);
+    const usagePctText = (budgetRatio * 100).toFixed(0);
     let remainingLabel;
     if (overBudget) {
         remainingLabel = `${formatCurrency(totalNeg)} de ${formatCurrency(budget)} (⚠️ acima ${formatCurrency(Math.abs(remaining))})`;
-    } else if (savingsRatio > 0) {
-        remainingLabel = `${formatCurrency(totalNeg)} de ${formatCurrency(budget)} (💰 ${savingsPctText}% economia)`;
+    } else if (savingsRatio > 0.01) {
+        remainingLabel = `${formatCurrency(totalNeg)} de ${formatCurrency(budget)} (${usagePctText}% uso · 💰 ${savingsPctText}% economia)`;
     } else {
-        remainingLabel = `${formatCurrency(totalNeg)} de ${formatCurrency(budget)} (sobra ${formatCurrency(remaining)})`;
+        remainingLabel = `${formatCurrency(totalNeg)} de ${formatCurrency(budget)} (${usagePctText}% do budget)`;
     }
 
     blockElement.querySelector('.eff-gauge-value').textContent = remainingLabel;
@@ -705,12 +713,12 @@ function updateEfficiencyGauge(block, blockElement) {
     // Color feedback
     if (overBudget) {
         effCursor.style.backgroundColor = '#EF4444'; // red - over budget
-    } else if (savingsRatio >= 0.15) {
-        effCursor.style.backgroundColor = '#10B981'; // green - strong negotiation
-    } else if (savingsRatio > 0) {
-        effCursor.style.backgroundColor = '#F59E0B'; // yellow - some savings
+    } else if (effPercent >= 70) {
+        effCursor.style.backgroundColor = '#10B981'; // green - strong efficiency
+    } else if (effPercent >= 40) {
+        effCursor.style.backgroundColor = '#F59E0B'; // yellow - moderate
     } else {
-        effCursor.style.backgroundColor = '#94A3B8'; // gray - no discount
+        effCursor.style.backgroundColor = '#94A3B8'; // gray - low usage
     }
 }
 

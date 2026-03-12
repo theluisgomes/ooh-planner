@@ -451,6 +451,14 @@ function setupBlockListeners(blockElement, blockId) {
 
     const deleteBtn = blockElement.querySelector('.btn-delete');
     deleteBtn.addEventListener('click', () => removeBlock(blockId));
+
+    const hintBtn = blockElement.querySelector('.btn-hint');
+    hintBtn.addEventListener('click', () => {
+        const hintBox = blockElement.querySelector('.block-hint-box');
+        const isVisible = hintBox.style.display === 'flex';
+        hintBox.style.display = isVisible ? 'none' : 'flex';
+        hintBtn.style.background = isVisible ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.3)';
+    });
 }
 
 function setupEventListeners() {
@@ -509,6 +517,7 @@ function updateBlockUI(blockId) {
 
     renderPlanningTableBody(blockId);
     updateGauges(blockId);
+    updateBlockHints(blockId); // Update AI hints
     renderGlobalDashboard();
     renderMap();
 }
@@ -788,6 +797,55 @@ function updateEfficiencyGauge(block, blockElement) {
         effCursor.style.backgroundColor = '#F59E0B'; // yellow - moderate
     } else {
         effCursor.style.backgroundColor = '#94A3B8'; // gray - low usage
+    }
+}
+
+// ============================================
+// HINT SYSTEM LOGIC
+// ============================================
+function updateBlockHints(blockId) {
+    const block = getBlockById(blockId);
+    const blockElement = document.querySelector(`[data-block-id="${blockId}"]`);
+    if (!blockElement || !block.planningRows) return;
+
+    const hintBtn = blockElement.querySelector('.btn-hint');
+    const hintBox = blockElement.querySelector('.block-hint-box');
+    const hintText = blockElement.querySelector('.hint-text');
+
+    const budget = block.budget || 0;
+    const totalNeg = block.planningRows.reduce((s, r) => s + r.ttNeg, 0);
+    const totalTabela = block.planningRows.reduce((s, r) => s + r.totalLinha, 0);
+    const facesAllocated = block.planningRows.reduce((s, r) => s + (r.s1_edit || 0) + (r.s2_edit || 0) + (r.s3_edit || 0) + (r.s4_edit || 0), 0);
+    const totalAvailable = block.planningRows.reduce((s, r) => s + r.totalFaces * 4, 0);
+
+    const savingsRatio = totalTabela > 0 ? 1 - (totalNeg / totalTabela) : 0;
+    const exposureRatio = totalAvailable > 0 ? facesAllocated / totalAvailable : 0;
+    const budgetRatio = budget > 0 ? totalNeg / budget : 0;
+
+    let advice = "";
+    let priority = 0; // 0: low, 1: med, 2: high
+
+    if (budgetRatio > 1.05) {
+        advice = "⚠️ Seu plano está acima do budget. Tente negociar descontos maiores nos veículos de maior peso ou reduza a quantidade de faces nos formatos menos estratégicos.";
+        priority = 2;
+    } else if (exposureRatio < 0.3) {
+        advice = "💡 A exposição está baixa para esta praça. Considere aumentar a quantidade de faces para garantir cobertura mínima, ou foque em formatos de maior impacto.";
+        priority = 1;
+    } else if (savingsRatio < 0.1) {
+        advice = "📉 Eficiência pode melhorar. Tente negociar pelo menos 15% de desconto para este recorte de mídia.";
+    } else if (budgetRatio < 0.7) {
+        advice = "💰 Sobrou budget significativo. Você pode aumentar a frequência (semanas) ou contratar mais faces para dominar a praça.";
+        priority = 1;
+    } else {
+        advice = "✨ Plano equilibrado! A relação entre custo, negociação e exposição está dentro dos parâmetros ideais.";
+    }
+
+    hintText.textContent = advice;
+    hintBtn.style.display = 'block';
+    
+    // Auto-show hint box if priority is high or if it's the first render
+    if (priority >= 2 && hintBox.style.display === 'none') {
+        hintBox.style.display = 'flex';
     }
 }
 

@@ -5,119 +5,862 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Histórico de Planos | OOH Planner</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        .history-container {
-            max-width: 1000px;
-            margin: 40px auto;
-            padding: 20px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        /* ============================================
+           HISTORY PAGE STYLES
+           ============================================ */
+
+        /* Hero banner */
+        .history-hero {
+            background: linear-gradient(135deg, rgba(0, 217, 163, 0.06), rgba(99, 102, 241, 0.06));
+            border-bottom: 1px solid var(--border);
+            padding: 2.5rem 0 2rem;
         }
 
-        .history-header {
+        .history-hero-content {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #eee;
+            justify-content: space-between;
+            gap: 1rem;
         }
 
-        .history-table {
-            width: 100%;
-            border-collapse: collapse;
+        .history-hero-left {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
         }
 
-        .history-table th,
-        .history-table td {
-            padding: 15px;
-            text-align: left;
-            border-bottom: 1px solid #eee;
+        .history-hero-left h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
-        .history-table th {
+        .history-hero-left p {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            max-width: 480px;
+        }
+
+        .btn-back {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.625rem 1.25rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
             font-weight: 600;
-            color: #555;
-            background: #f9fafb;
-        }
-
-        .history-table tr:last-child td {
-            border-bottom: none;
-        }
-
-        .history-table tr:hover {
-            background-color: #f8fcf8;
-        }
-
-        .btn-load {
-            background-color: var(--primary);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 6px;
-            text-decoration: none;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.2s;
-            border: none;
+            font-size: 0.8125rem;
             cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            background: white;
+            color: var(--text-primary);
+            text-decoration: none;
         }
 
-        .btn-load:hover {
-            opacity: 0.9;
+        .btn-back:hover {
+            background: var(--bg-main);
+            border-color: var(--primary);
+            color: var(--primary-dark);
+        }
+
+        /* Stats row */
+        .history-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 1rem 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            transition: box-shadow 0.2s, transform 0.2s;
+        }
+
+        .stat-card:hover {
+            box-shadow: var(--shadow-md);
             transform: translateY(-1px);
         }
 
-        .empty-state {
+        .stat-card-label {
+            font-size: 0.625rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+        }
+
+        .stat-card-value {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            line-height: 1.1;
+        }
+
+        .stat-card-value.accent-green {
+            color: var(--success);
+        }
+
+        .stat-card-value.accent-blue {
+            color: var(--info);
+        }
+
+        .stat-card-value.accent-purple {
+            color: var(--secondary);
+        }
+
+        /* Main content area */
+        .history-main {
+            padding: 2rem 0 3rem;
+        }
+
+        /* Search and filters bar */
+        .history-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.25rem;
+            gap: 1rem;
+        }
+
+        .search-box {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 0.5rem 0.75rem;
+            flex: 1;
+            max-width: 360px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .search-box:focus-within {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(0, 217, 163, 0.1);
+        }
+
+        .search-box-icon {
+            font-size: 1rem;
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+
+        .search-input {
+            border: none;
+            background: transparent;
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            width: 100%;
+            outline: none;
+            font-family: inherit;
+        }
+
+        .search-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .sort-selector {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .sort-selector label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+        }
+
+        .sort-select {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 0.5rem 0.75rem;
+            font-size: 0.8125rem;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .sort-select:focus {
+            border-color: var(--primary);
+        }
+
+        /* Plans grid / card list */
+        .plans-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .plan-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 1.25rem 1.5rem;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 1rem;
+            align-items: center;
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-sm);
+            animation: fadeIn 0.3s ease both;
+        }
+
+        .plan-card:hover {
+            box-shadow: var(--shadow-md);
+            border-color: var(--primary);
+            transform: translateY(-1px);
+        }
+
+        .plan-card-left {
+            display: flex;
+            flex-direction: column;
+            gap: 0.375rem;
+            min-width: 0;
+        }
+
+        .plan-card-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .plan-id-badge {
+            font-size: 0.65rem;
+            font-weight: 600;
+            background: rgba(99, 102, 241, 0.08);
+            color: var(--secondary);
+            padding: 0.15rem 0.5rem;
+            border-radius: 999px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            letter-spacing: 0.3px;
+        }
+
+        .plan-card-meta {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+
+        .plan-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .plan-meta-icon {
+            font-size: 0.875rem;
+            opacity: 0.7;
+        }
+
+        .plan-card-right {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-open {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.5rem 1rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+        }
+
+        .btn-open:hover {
+            background: var(--primary-dark);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-1px);
+        }
+
+        .btn-delete-plan {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2rem;
+            height: 2rem;
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-delete-plan:hover {
+            background: rgba(239, 68, 68, 0.08);
+            color: var(--error);
+            border-color: rgba(239, 68, 68, 0.2);
+        }
+
+        /* Empty state */
+        .empty-state-card {
+            background: var(--bg-card);
+            border: 2px dashed var(--border);
+            border-radius: var(--radius-lg);
+            padding: 3.5rem 2rem;
             text-align: center;
-            padding: 40px;
-            color: #888;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .empty-state-title {
+            font-size: 1.125rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .empty-state-text {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            max-width: 360px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .btn-create-plan {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .btn-create-plan:hover {
+            background: var(--primary-dark);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-1px);
+        }
+
+        /* Loading skeleton */
+        .skeleton-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 1.25rem 1.5rem;
+            height: 80px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .skeleton-card::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg,
+                    transparent,
+                    rgba(0, 217, 163, 0.04),
+                    transparent);
+            animation: skeleton-shimmer 1.5s ease-in-out infinite;
+        }
+
+        @keyframes skeleton-shimmer {
+            0% {
+                transform: translateX(-100%);
+            }
+
+            100% {
+                transform: translateX(100%);
+            }
+        }
+
+        .skeleton-line {
+            background: var(--bg-main);
+            border-radius: 4px;
+            height: 14px;
+            margin-bottom: 8px;
+        }
+
+        .skeleton-line.w60 {
+            width: 60%;
+        }
+
+        .skeleton-line.w40 {
+            width: 40%;
+        }
+
+        .skeleton-line.w30 {
+            width: 30%;
+        }
+
+        /* Error state */
+        .error-state-card {
+            background: rgba(239, 68, 68, 0.04);
+            border: 1px solid rgba(239, 68, 68, 0.15);
+            border-radius: var(--radius-md);
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .error-icon {
+            font-size: 2rem;
+            margin-bottom: 0.75rem;
+            display: block;
+        }
+
+        .error-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--error);
+            margin-bottom: 0.375rem;
+        }
+
+        .error-text {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+
+        /* Stagger animation */
+        .plan-card:nth-child(1) {
+            animation-delay: 0ms;
+        }
+
+        .plan-card:nth-child(2) {
+            animation-delay: 50ms;
+        }
+
+        .plan-card:nth-child(3) {
+            animation-delay: 100ms;
+        }
+
+        .plan-card:nth-child(4) {
+            animation-delay: 150ms;
+        }
+
+        .plan-card:nth-child(5) {
+            animation-delay: 200ms;
+        }
+
+        .plan-card:nth-child(6) {
+            animation-delay: 250ms;
+        }
+
+        .plan-card:nth-child(7) {
+            animation-delay: 300ms;
+        }
+
+        .plan-card:nth-child(8) {
+            animation-delay: 350ms;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .history-hero-content {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .history-stats {
+                grid-template-columns: 1fr;
+            }
+
+            .history-toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .search-box {
+                max-width: 100%;
+            }
+
+            .plan-card {
+                grid-template-columns: 1fr;
+            }
+
+            .plan-card-right {
+                justify-content: flex-end;
+            }
         }
     </style>
 </head>
 
 <body>
-    <header>
-        <div class="logo-area">
-            <span class="logo-icon">📊</span>
-            <h1>OOH Planner <span class="version-badge">v2.0</span></h1>
-        </div>
-        <div class="user-profile">
-            <span class="user-greeting">Olá, Usuário</span>
-            <button id="btnLogout" class="btn-logout"><span class="material-icons">logout</span></button>
+    <!-- Header (matches main app) -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <img src="logo.png" alt="Logo OOH Planner" class="logo-icon"
+                        style="width: 50px; height: 50px; border-radius: 100%;">
+                    <div>
+                        <h1>O Boticário</h1>
+                        <p class="subtitle">OOH PLANNER - DATA-FLOW V2.1</p>
+                    </div>
+                </div>
+
+                <div class="header-actions">
+                    <a href="/" class="btn btn-secondary"
+                        style="padding: 0.5rem 1rem; font-size: 0.875rem; margin-right: 0.5rem; text-decoration: none; display: inline-flex; align-items: center;">
+                        📝 Novo Plano
+                    </a>
+                    <button class="btn btn-secondary" id="btnLogout" style="padding: 0.5rem 1rem; font-size: 0.875rem;">
+                        🚪 Sair
+                    </button>
+                </div>
+            </div>
         </div>
     </header>
 
-    <div class="history-container">
-        <div class="history-header">
-            <h2>📜 Histórico de Versões</h2>
-            <a href="/" class="btn-secondary">
-                <span class="material-icons" style="font-size: 16px; margin-right: 5px;">arrow_back</span>
-                Voltar ao Editor
-            </a>
+    <!-- Hero Section -->
+    <section class="history-hero">
+        <div class="container">
+            <div class="history-hero-content">
+                <div class="history-hero-left">
+                    <h2>📜 Histórico de Planos</h2>
+                    <p>Gerencie e acesse todos os seus planos de mídia salvos. Selecione um plano para continuar
+                        editando ou criar um novo.</p>
+                </div>
+                <a href="/" class="btn-back">
+                    ← Voltar ao Editor
+                </a>
+            </div>
+
+            <!-- Stats -->
+            <div class="history-stats">
+                <div class="stat-card">
+                    <span class="stat-card-label">Total de Planos</span>
+                    <span class="stat-card-value accent-blue" id="statTotal">--</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-card-label">Último Plano Salvo</span>
+                    <span class="stat-card-value accent-green" id="statLastDate" style="font-size: 1rem;">--</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-card-label">Usuário</span>
+                    <span class="stat-card-value accent-purple" id="statUser" style="font-size: 1rem;">--</span>
+                </div>
+            </div>
         </div>
+    </section>
 
-        <table class="history-table">
-            <thead>
-                <tr>
-                    <th>Nome do Plano</th>
-                    <th>ID</th>
-                    <th>Data de Criação</th>
-                    <th style="text-align: right;">Ações</th>
-                </tr>
-            </thead>
-            <tbody id="historyTableBody">
-                <tr>
-                    <td colspan="4" class="empty-state">Carregando histórico...</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
+    <!-- Main Content -->
+    <main class="history-main">
+        <div class="container">
+            <!-- Toolbar -->
+            <div class="history-toolbar">
+                <div class="search-box">
+                    <span class="search-box-icon">🔍</span>
+                    <input type="text" class="search-input" id="searchInput" placeholder="Buscar por nome do plano...">
+                </div>
+                <div class="sort-selector">
+                    <label>Ordenar por:</label>
+                    <select class="sort-select" id="sortSelect">
+                        <option value="newest">Mais recente</option>
+                        <option value="oldest">Mais antigo</option>
+                        <option value="name">Nome A-Z</option>
+                        <option value="name-desc">Nome Z-A</option>
+                    </select>
+                </div>
+            </div>
 
-    <script src="js/history.js"></script>
+            <!-- Plans List -->
+            <div class="plans-list" id="plansList">
+                <!-- Loading skeletons shown initially -->
+                <div class="skeleton-card">
+                    <div class="skeleton-line w60"></div>
+                    <div class="skeleton-line w40"></div>
+                </div>
+                <div class="skeleton-card">
+                    <div class="skeleton-line w60"></div>
+                    <div class="skeleton-line w30"></div>
+                </div>
+                <div class="skeleton-card">
+                    <div class="skeleton-line w60"></div>
+                    <div class="skeleton-line w40"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // ============================================
+        // STATE
+        // ============================================
+        let allPlans = [];
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Check auth
+            try {
+                const authResponse = await fetch('/api/check-auth');
+                const authData = await authResponse.json();
+
+                if (!authData.authenticated) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+
+                // Show username
+                if (authData.user) {
+                    document.getElementById('statUser').textContent = authData.user.username;
+                }
+
+                // Load plans
+                await loadPlans();
+
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                showError('Erro de conexão ao verificar autenticação.');
+            }
+
+            // Logout handler
+            document.getElementById('btnLogout').addEventListener('click', async () => {
+                try {
+                    await fetch('/logout', { method: 'POST' });
+                    window.location.href = '/login.html';
+                } catch (error) {
+                    console.error('Logout failed:', error);
+                }
+            });
+
+            // Search handler
+            document.getElementById('searchInput').addEventListener('input', (e) => {
+                renderPlans(filterAndSort());
+            });
+
+            // Sort handler
+            document.getElementById('sortSelect').addEventListener('change', () => {
+                renderPlans(filterAndSort());
+            });
+        });
+
+        // ============================================
+        // API
+        // ============================================
+        async function loadPlans() {
+            const container = document.getElementById('plansList');
+
+            try {
+                const response = await fetch('/api/plans');
+                const data = await response.json();
+
+                if (data.success && data.plans.length > 0) {
+                    allPlans = data.plans;
+                    updateStats();
+                    renderPlans(filterAndSort());
+                } else {
+                    allPlans = [];
+                    updateStats();
+                    showEmpty();
+                }
+            } catch (error) {
+                console.error('Failed to load plans:', error);
+                showError(`Erro ao carregar planos: ${error.message}`);
+            }
+        }
+
+        // ============================================
+        // FILTERING & SORTING
+        // ============================================
+        function filterAndSort() {
+            const query = document.getElementById('searchInput').value.toLowerCase().trim();
+            const sort = document.getElementById('sortSelect').value;
+
+            let filtered = [...allPlans];
+
+            // Filter by search query
+            if (query) {
+                filtered = filtered.filter(p =>
+                    (p.name || '').toLowerCase().includes(query)
+                );
+            }
+
+            // Sort
+            switch (sort) {
+                case 'newest':
+                    filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                    break;
+                case 'oldest':
+                    filtered.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+                    break;
+                case 'name':
+                    filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                    break;
+                case 'name-desc':
+                    filtered.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+                    break;
+            }
+
+            return filtered;
+        }
+
+        // ============================================
+        // RENDERING
+        // ============================================
+        function renderPlans(plans) {
+            const container = document.getElementById('plansList');
+
+            if (plans.length === 0) {
+                const query = document.getElementById('searchInput').value.trim();
+                if (query) {
+                    container.innerHTML = `
+                        <div class="empty-state-card">
+                            <span class="empty-state-icon">🔍</span>
+                            <div class="empty-state-title">Nenhum resultado encontrado</div>
+                            <div class="empty-state-text">Não há planos correspondentes à busca "${query}".</div>
+                        </div>
+                    `;
+                } else {
+                    showEmpty();
+                }
+                return;
+            }
+
+            container.innerHTML = plans.map(plan => {
+                const date = new Date(plan.created_at);
+                const dateStr = date.toLocaleDateString('pt-BR', {
+                    day: '2-digit', month: 'short', year: 'numeric'
+                });
+                const timeStr = date.toLocaleTimeString('pt-BR', {
+                    hour: '2-digit', minute: '2-digit'
+                });
+
+                // Calculate relative time
+                const now = new Date();
+                const diffMs = now - date;
+                const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                let relativeTime;
+                if (diffDays === 0) relativeTime = 'Hoje';
+                else if (diffDays === 1) relativeTime = 'Ontem';
+                else if (diffDays < 7) relativeTime = `${diffDays} dias atrás`;
+                else if (diffDays < 30) relativeTime = `${Math.floor(diffDays / 7)} sem. atrás`;
+                else relativeTime = `${Math.floor(diffDays / 30)} mês(es) atrás`;
+
+                return `
+                    <div class="plan-card">
+                        <div class="plan-card-left">
+                            <div class="plan-card-title">
+                                📋 ${plan.name || 'Plano sem nome'}
+                                <span class="plan-id-badge">#${plan.id}</span>
+                            </div>
+                            <div class="plan-card-meta">
+                                <span class="plan-meta-item">
+                                    <span class="plan-meta-icon">📅</span>
+                                    ${dateStr} às ${timeStr}
+                                </span>
+                                <span class="plan-meta-item">
+                                    <span class="plan-meta-icon">🕐</span>
+                                    ${relativeTime}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="plan-card-right">
+                            <button class="btn-open" onclick="openPlan(${plan.id})">
+                                ✏️ Abrir Plano
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function showEmpty() {
+            const container = document.getElementById('plansList');
+            container.innerHTML = `
+                <div class="empty-state-card">
+                    <span class="empty-state-icon">📂</span>
+                    <div class="empty-state-title">Nenhum plano salvo</div>
+                    <div class="empty-state-text">Você ainda não salvou nenhum plano de mídia. Comece criando seu primeiro plano no editor.</div>
+                    <a href="/" class="btn-create-plan">
+                        ➕ Criar Novo Plano
+                    </a>
+                </div>
+            `;
+        }
+
+        function showError(message) {
+            const container = document.getElementById('plansList');
+            container.innerHTML = `
+                <div class="error-state-card">
+                    <span class="error-icon">⚠️</span>
+                    <div class="error-title">Erro ao carregar</div>
+                    <div class="error-text">${message}</div>
+                </div>
+            `;
+        }
+
+        function updateStats() {
+            document.getElementById('statTotal').textContent = allPlans.length;
+
+            if (allPlans.length > 0) {
+                // Find most recent
+                const sorted = [...allPlans].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                const latest = new Date(sorted[0].created_at);
+                document.getElementById('statLastDate').textContent = latest.toLocaleDateString('pt-BR', {
+                    day: '2-digit', month: 'short', year: 'numeric'
+                });
+            } else {
+                document.getElementById('statLastDate').textContent = 'Nenhum';
+            }
+        }
+
+        // ============================================
+        // ACTIONS
+        // ============================================
+        function openPlan(id) {
+            if (confirm('Deseja carregar este plano? O trabalho atual não salvo será perdido.')) {
+                window.location.href = `/?planId=${id}`;
+            }
+        }
+    </script>
 </body>
 
 </html>

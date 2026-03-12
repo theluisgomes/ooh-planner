@@ -7,12 +7,23 @@ const mockInventory = [
         ID: 1,
         praca: 'SAO PAULO',
         uf: 'SP',
-        formato: 'Relógio de Rua', // Should trigger high exposure
+        formato: 'Relógio de Rua',
         digital: 1,
         estatico: 0,
         unitario_bruto_negociado: 1000,
         range_minimo: 10,
         range_maximo: 20
+    },
+    {
+        ID: 2,
+        praca: 'SAO PAULO',
+        uf: 'SP',
+        formato: 'Outdoor',
+        digital: 0,
+        estatico: 1,
+        unitario_bruto_negociado: 2000,
+        range_minimo: 5,
+        range_maximo: 10
     }
 ];
 
@@ -22,6 +33,7 @@ const campaignCycle = 4;
 const result = budgetOptimizer.optimizeAllocation(budget, campaignCycle, mockInventory);
 
 console.log('Result Status:', result.status);
+console.log('Ideal Budget:', result.idealBudget);
 console.log('Allocated Budget:', result.allocatedBudget);
 console.log('Faces Count:', result.facesCount);
 console.log('Exposicao Estimada:', result.exposicao_estimada);

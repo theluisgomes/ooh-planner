@@ -171,11 +171,11 @@ class BudgetOptimizer {
      * Calculate ideal budget for a given market/filters
      */
     calculateIdealBudget(inventory, campaignCycle) {
-        // Calculate 75th percentile of potential spend
-        // This represents a "good coverage" budget
+        // Calculate 50th percentile (median) of potential spend
+        // This represents a "standard coverage" budget
 
         const rankedFaces = this.prioritizeFaces(inventory, campaignCycle);
-        const topFaces = rankedFaces.slice(0, Math.ceil(rankedFaces.length * 0.75));
+        const topFaces = rankedFaces.slice(0, Math.ceil(rankedFaces.length * 0.5));
 
         const idealBudget = topFaces.reduce((sum, face) => {
             const minQuantity = this.parseNumber(face.range_minimo);

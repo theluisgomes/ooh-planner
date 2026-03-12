@@ -107,6 +107,68 @@ async function loadFilters() {
     }
 }
 
+/**
+ * Cross-filter: update taxonomia options based on selected praça
+ */
+async function updateTaxonomiaOptions(blockElement, praca) {
+    const taxonomiaSelect = blockElement.querySelector('.input-taxonomia');
+    if (!taxonomiaSelect) return;
+
+    const currentValue = taxonomiaSelect.value;
+
+    // Clear existing options (keep the default empty option)
+    taxonomiaSelect.innerHTML = '<option value="">Selecione...</option>';
+
+    if (!praca) {
+        // No praça selected — show all taxonomias
+        (state.filters.taxonomia || []).forEach(val => {
+            const option = document.createElement('option');
+            option.value = val;
+            option.textContent = val;
+            taxonomiaSelect.appendChild(option);
+        });
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/filters/available`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filters: { praca } })
+        });
+
+        if (!response.ok) throw new Error('Erro ao buscar filtros disponíveis');
+
+        const available = await response.json();
+        const taxonomias = available.taxonomia || [];
+
+        taxonomias.forEach(val => {
+            const option = document.createElement('option');
+            option.value = val;
+            option.textContent = val;
+            taxonomiaSelect.appendChild(option);
+        });
+
+        // Preserve previous selection if still valid
+        if (currentValue && taxonomias.includes(currentValue)) {
+            taxonomiaSelect.value = currentValue;
+        } else {
+            taxonomiaSelect.value = '';
+        }
+
+        console.log(`🔗 Cross-filter: praça "${praca}" → ${taxonomias.length} taxonomias disponíveis`);
+    } catch (err) {
+        console.error('Erro ao atualizar taxonomias:', err);
+        // Fallback: show all taxonomias
+        (state.filters.taxonomia || []).forEach(val => {
+            const option = document.createElement('option');
+            option.value = val;
+            option.textContent = val;
+            taxonomiaSelect.appendChild(option);
+        });
+    }
+}
+
 async function fetchPlanningData(blockId) {
     const block = getBlockById(blockId);
 
@@ -373,8 +435,17 @@ function setupBlockListeners(blockElement, blockId) {
     });
 
     const pracaSelect = blockElement.querySelector('.input-praca');
-    pracaSelect.addEventListener('change', (e) => {
-        getBlockById(blockId).praca = e.target.value || null;
+    pracaSelect.addEventListener('change', async (e) => {
+        const block = getBlockById(blockId);
+        block.praca = e.target.value || null;
+
+        // Cross-filter: update taxonomia options based on selected praça
+        await updateTaxonomiaOptions(blockElement, block.praca);
+
+        // If taxonomia was reset (no longer valid for new praça), update block state
+        const taxonomiaSelect = blockElement.querySelector('.input-taxonomia');
+        block.taxonomia = taxonomiaSelect.value || null;
+
         fetchPlanningData(blockId);
     });
 
@@ -668,29 +739,29 @@ function updateEfficiencyGauge(block, blockElement) {
     const totalNeg = rows.reduce((s, r) => s + r.ttNeg, 0);
     const totalTabela = rows.reduce((s, r) => s + r.totalLinha, 0);
 
-    // Two efficiency dimensions:
-    // 1) Budget utilization: how much of the budget is being used (0 to 1+)
-    const budgetRatio = budget > 0 ? totalNeg / budget : 0;    // 0.9 = 90% used
-    const overBudget = budgetRatio > 1;
-
-    // 2) Negotiation savings: how much cheaper vs table price (0 to 1)
+    // Efficiency dimensions:
+    // 1) Negotiation savings: primary driver (0 to 100%)
     const savingsRatio = totalTabela > 0 ? 1 - (totalNeg / totalTabela) : 0;
+    
+    // 2) Budget Adherence: penalty if over budget
+    const budgetRatio = budget > 0 ? totalNeg / budget : 0;
+    const overBudget = budgetRatio > 1.05; // 5% grace margin
 
-    // Composite efficiency score (0 to 100):
-    // - Budget utilization contributes 60% (sweet spot at 80-100%)
-    // - Savings from negotiation contributes 40%
+    // Calculate efficiency score:
+    // Base score is savings % × 100 (e.g. 30% savings = 60 efficiency score baseline)
+    // Plus a bonus for staying within budget.
     let effPercent;
-    if (overBudget) {
-        // Over budget → push left (penalty). 1× = 40%, 2× = 2%
-        effPercent = Math.max(40 - (budgetRatio - 1) * 40, 2);
-    } else if (budget > 0) {
-        // Within budget: utilization (capped at 100%) + savings bonus
-        const utilizationScore = Math.min(budgetRatio, 1) * 60;  // 0-60
-        const savingsScore = savingsRatio * 40;                    // 0-40
-        effPercent = utilizationScore + savingsScore;              // 0-100
-    } else {
+    
+    if (totalTabela === 0) {
         effPercent = 2;
+    } else {
+        // Efficiency = (Savings Ratio * 80) + (Budget Adherence * 20)
+        // This ensures that increasing discount ALWAYS increases efficiency.
+        const savingsScore = savingsRatio * 80;
+        const adherenceScore = overBudget ? 0 : 20;
+        effPercent = savingsScore + adherenceScore;
     }
+
     effPercent = Math.min(Math.max(effPercent, 2), 98);
 
     // Label
@@ -699,11 +770,9 @@ function updateEfficiencyGauge(block, blockElement) {
     const usagePctText = (budgetRatio * 100).toFixed(0);
     let remainingLabel;
     if (overBudget) {
-        remainingLabel = `${formatCurrency(totalNeg)} de ${formatCurrency(budget)} (⚠️ acima ${formatCurrency(Math.abs(remaining))})`;
-    } else if (savingsRatio > 0.01) {
-        remainingLabel = `${formatCurrency(totalNeg)} de ${formatCurrency(budget)} (${usagePctText}% uso · 💰 ${savingsPctText}% economia)`;
+        remainingLabel = `${formatCurrency(totalNeg)} (⚠️ ${usagePctText}% do budget)`;
     } else {
-        remainingLabel = `${formatCurrency(totalNeg)} de ${formatCurrency(budget)} (${usagePctText}% do budget)`;
+        remainingLabel = `${formatCurrency(totalNeg)} neg. (${savingsPctText}% de economia)`;
     }
 
     blockElement.querySelector('.eff-gauge-value').textContent = remainingLabel;

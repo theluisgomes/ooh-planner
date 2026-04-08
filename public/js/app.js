@@ -36,10 +36,16 @@ function removeBlock(blockId) {
         resetBlock(blockId);
         return;
     }
-    if (!confirm('Tem certeza que deseja remover este recorte de mídia?')) return;
+    if (!confirm('Tem certeza que deseja remover este plano de mídia?')) return;
     state.mediaBlocks = state.mediaBlocks.filter(b => b.id !== Number(blockId));
     renderMediaBlocks();
     updateConsolidated();
+}
+
+// Fix #8: Title case helper for praça dropdown labels
+function toTitleCase(str) {
+    if (!str) return str;
+    return str.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
 }
 
 const state = {
@@ -120,7 +126,7 @@ async function updateTaxonomiaOptions(blockElement, praca) {
     taxonomiaSelect.innerHTML = '<option value="">Selecione...</option>';
 
     if (!praca) {
-        // No praça selected — show all taxonomias
+        // No praça selected — show all ciclos
         (state.filters.taxonomia || []).forEach(val => {
             const option = document.createElement('option');
             option.value = val;
@@ -156,10 +162,10 @@ async function updateTaxonomiaOptions(blockElement, praca) {
             taxonomiaSelect.value = '';
         }
 
-        console.log(`🔗 Cross-filter: praça "${praca}" → ${taxonomias.length} taxonomias disponíveis`);
+        console.log(`🔗 Cross-filter: praça "${praca}" → ${taxonomias.length} ciclos disponíveis`);
     } catch (err) {
-        console.error('Erro ao atualizar taxonomias:', err);
-        // Fallback: show all taxonomias
+        console.error('Erro ao atualizar ciclos:', err);
+        // Fallback: show all ciclos
         (state.filters.taxonomia || []).forEach(val => {
             const option = document.createElement('option');
             option.value = val;
@@ -211,7 +217,8 @@ async function fetchPlanningData(blockId) {
             // Initialize planningRows with editable fields
             block.planningRows = result.rows.map(row => ({
                 ...row,
-                negociacao_edit: 0,              // starts at 0% - user adds discount
+                // Fix #3: prefill desconto da base (base stores as decimal 0-1, e.g. 0.6 = 60%)
+                negociacao_edit: row.desconto || 0,
                 obs: '',                        // user notes
                 s1_edit: 0,
                 s2_edit: 0,
@@ -248,6 +255,38 @@ function autoAllocateFaces(block) {
     const budget = block.budget || 0;
     const rows = block.planningRows;
 
+    // Fix #2: Helper to distribute faces using s1/s2/s3/s4 proportions from base
+    // This ensures we respect the total quantity and the inventory availability pattern
+    function allocateWithWeekWeights(row, facesTotal) {
+        const totalWeight = (row.s1 || 0) + (row.s2 || 0) + (row.s3 || 0) + (row.s4 || 0);
+        if (totalWeight <= 0) {
+            // No distribution data in base — distribute evenly across 4 weeks
+            const perWeek = Math.floor(facesTotal / 4);
+            row.s1_edit = perWeek;
+            row.s2_edit = perWeek;
+            row.s3_edit = perWeek;
+            row.s4_edit = facesTotal - (perWeek * 3); // putting remainder in last week
+        } else {
+            // Distribute facesTotal following the base proportions (s1/s2/s3/s4)
+            row.s1_edit = Math.round(facesTotal * ((row.s1 || 0) / totalWeight));
+            row.s2_edit = Math.round(facesTotal * ((row.s2 || 0) / totalWeight));
+            row.s3_edit = Math.round(facesTotal * ((row.s3 || 0) / totalWeight));
+            row.s4_edit = Math.round(facesTotal * ((row.s4 || 0) / totalWeight));
+
+            // Small adjustment to ensure sum equals exactly facesTotal due to rounding
+            const currentSum = row.s1_edit + row.s2_edit + row.s3_edit + row.s4_edit;
+            if (currentSum !== facesTotal) {
+                const diff = facesTotal - currentSum;
+                // Add diff to the first non-zero week or s1
+                if (row.s1_edit > 0) row.s1_edit += diff;
+                else if (row.s2_edit > 0) row.s2_edit += diff;
+                else if (row.s3_edit > 0) row.s3_edit += diff;
+                else if (row.s4_edit > 0) row.s4_edit += diff;
+                else row.s1_edit += diff;
+            }
+        }
+    }
+
     // Total cost at full capacity (all faces, no discounts)
     const totalMaxCost = rows.reduce((sum, r) => sum + r.unitario_bruto_tabela * r.totalFaces, 0);
 
@@ -261,12 +300,9 @@ function autoAllocateFaces(block) {
     }
 
     if (budget >= totalMaxCost) {
-        // Budget covers everything — allocate all available faces
+        // Budget covers everything — allocate all available faces with week weights
         rows.forEach(row => {
-            row.s1_edit = row.totalFaces;
-            row.s2_edit = row.totalFaces;
-            row.s3_edit = row.totalFaces;
-            row.s4_edit = row.totalFaces;
+            allocateWithWeekWeights(row, row.totalFaces);
         });
     } else {
         // Budget is limited — allocate proportionally, weighted by ranking (pesos)
@@ -289,10 +325,8 @@ function autoAllocateFaces(block) {
             const maxAffordable = Math.floor(rowBudget / row.unitario_bruto_tabela);
             const allocated = Math.min(maxAffordable, row.totalFaces);
 
-            row.s1_edit = allocated;
-            row.s2_edit = allocated;
-            row.s3_edit = allocated;
-            row.s4_edit = allocated;
+            // Fix #2: distribute allocated faces using week weights
+            allocateWithWeekWeights(row, allocated);
 
             remainingBudget -= row.unitario_bruto_tabela * allocated;
         });
@@ -301,16 +335,13 @@ function autoAllocateFaces(block) {
         if (remainingBudget > 0) {
             for (const { row } of indexed) {
                 if (remainingBudget <= 0) break;
-                const currentFaces = row.s1_edit;
+                const currentFaces = Math.max(row.s1_edit, row.s2_edit, row.s3_edit, row.s4_edit);
                 const canAdd = row.totalFaces - currentFaces;
                 if (canAdd > 0 && row.unitario_bruto_tabela > 0) {
                     const extraAffordable = Math.floor(remainingBudget / row.unitario_bruto_tabela);
                     const extra = Math.min(extraAffordable, canAdd);
                     if (extra > 0) {
-                        row.s1_edit += extra;
-                        row.s2_edit += extra;
-                        row.s3_edit += extra;
-                        row.s4_edit += extra;
+                        allocateWithWeekWeights(row, currentFaces + extra);
                         remainingBudget -= row.unitario_bruto_tabela * extra;
                     }
                 }
@@ -327,11 +358,10 @@ function autoAllocateFaces(block) {
 function recalculatePlanningRows(block) {
     if (!block.planningRows) return;
 
-    const budget = block.budget || 0;
-
     block.planningRows.forEach(row => {
-        // Faces being used = max of S1-S4 (peak week = faces you need to rent)
-        row.facesUsadas = Math.max(row.s1_edit || 0, row.s2_edit || 0, row.s3_edit || 0, row.s4_edit || 0);
+        // Faces being used = sum of S1-S4 (total units across the period)
+        // Base distributes 'quantidade' into s1/s2/s3/s4, so the sum is the total count.
+        row.facesUsadas = (row.s1_edit || 0) + (row.s2_edit || 0) + (row.s3_edit || 0) + (row.s4_edit || 0);
 
         // Total Linha = tabela unit. × faces being used
         row.totalLinha = row.unitario_bruto_tabela * row.facesUsadas;
@@ -345,13 +375,9 @@ function recalculatePlanningRows(block) {
 
         // Recalc index based on faces being used
         row.index = Math.round(row.facesUsadas * (row.pesos || 0.5) * 100) / 100;
-    });
 
-    // Budget Ideal proportional to total cost at table price
-    const totalTabelaValue = block.planningRows.reduce((sum, r) => sum + r.totalLinha, 0);
-    block.planningRows.forEach(row => {
-        const proportion = totalTabelaValue > 0 ? row.totalLinha / totalTabelaValue : 0;
-        row.budgetIdeal = Math.round(budget * proportion);
+        // Fix #3: RECOMENDADO = total_bruto_negociado da base (valor fixo da base)
+        row.budgetIdeal = row.total_bruto_negociado || 0;
     });
 }
 
@@ -369,7 +395,7 @@ function renderMediaBlocks() {
         block.dataset.blockId = blockState.id;
 
         clone.querySelector('.number-badge').textContent = index + 1;
-        clone.querySelector('.config-label').textContent = `CONFIGURAÇÃO TÉCNICA #${String(index + 1).padStart(2, '0')}`;
+        clone.querySelector('.config-label').textContent = `PLANO DE MÍDIA #${String(index + 1).padStart(2, '0')}`;
 
         populateCoreSelects(block);
 
@@ -390,18 +416,19 @@ function renderMediaBlocks() {
 }
 
 function populateCoreSelects(blockElement) {
-    const fillSelect = (selector, data) => {
+    const fillSelect = (selector, data, applyTitleCase = false) => {
         const sel = blockElement.querySelector(selector);
         if (!sel || !data) return;
         data.forEach(val => {
             const option = document.createElement('option');
             option.value = val;
-            option.textContent = val;
+            // Fix #8: apply title case to display label for praças
+            option.textContent = applyTitleCase ? toTitleCase(val) : val;
             sel.appendChild(option);
         });
     };
 
-    fillSelect('.input-praca', state.filters.praca);
+    fillSelect('.input-praca', state.filters.praca, true); // Fix #8: title case
     fillSelect('.input-taxonomia', state.filters.taxonomia);
 }
 
@@ -531,35 +558,38 @@ function renderPlanningTableBody(blockId) {
     tbody.innerHTML = '';
 
     block.planningRows.forEach((row, index) => {
-        // Hide rows where all weeks are zero (no allocation)
-        const hasAllocation = (row.s1_edit || 0) + (row.s2_edit || 0) + (row.s3_edit || 0) + (row.s4_edit || 0) > 0;
-        if (!hasAllocation) return;
-
+        // Fix #1: Show ALL rows (even those with no allocation this cycle)
         const tr = document.createElement('tr');
         tr.className = index < 3 ? `priority-rank-${index + 1}` : '';
 
-        const digitalChecked = row.digital ? 'checked' : '';
-        const estaticoChecked = row.estatico ? 'checked' : '';
         const negPct = row.negociacao_edit ? (row.negociacao_edit * 100).toFixed(0) : '0';
+        // Fix #5/#6: range bounds from base
+        const rangeMin = row.range_minimo || 0;
+        const rangeMax = row.range_maximo || row.totalFaces;
 
         tr.innerHTML = `
             <td class="cell-veiculo">${row.exibidores || '--'}</td>
             <td class="cell-formato">${row.formato || '--'}</td>
-            <td class="cell-number">${row.totalFaces}</td>
+            <td class="cell-periodo">${row.periodicidade || '--'}</td>
+            <td class="cell-number range-min">${rangeMin}</td>
+            <td class="cell-number range-max">${rangeMax}</td>
+            <td class="cell-week">
+                <input type="number" class="inline-input input-total-faces" value="${row.totalFaces}" min="${rangeMin}" max="${rangeMax}" data-row="${index}" title="Mín: ${rangeMin} | Máx: ${rangeMax}">
+            </td>
             <td class="cell-number">${row.index}</td>
             <td class="cell-material"><span class="material-dot ${row.digital ? 'digital' : 'off'}"></span>DIG</td>
             <td class="cell-material"><span class="material-dot ${row.estatico ? 'estatico' : 'off'}"></span>EST</td>
             <td class="cell-week">
-                <input type="number" class="inline-input input-s1" value="${row.s1_edit}" min="0" max="${row.totalFaces}" data-row="${index}" data-field="s1_edit">
+                <input type="number" class="inline-input input-s1" value="${row.s1_edit}" min="0" max="${rangeMax}" data-row="${index}" data-field="s1_edit">
             </td>
             <td class="cell-week">
-                <input type="number" class="inline-input input-s2" value="${row.s2_edit}" min="0" max="${row.totalFaces}" data-row="${index}" data-field="s2_edit">
+                <input type="number" class="inline-input input-s2" value="${row.s2_edit}" min="0" max="${rangeMax}" data-row="${index}" data-field="s2_edit">
             </td>
             <td class="cell-week">
-                <input type="number" class="inline-input input-s3" value="${row.s3_edit}" min="0" max="${row.totalFaces}" data-row="${index}" data-field="s3_edit">
+                <input type="number" class="inline-input input-s3" value="${row.s3_edit}" min="0" max="${rangeMax}" data-row="${index}" data-field="s3_edit">
             </td>
             <td class="cell-week">
-                <input type="number" class="inline-input input-s4" value="${row.s4_edit}" min="0" max="${row.totalFaces}" data-row="${index}" data-field="s4_edit">
+                <input type="number" class="inline-input input-s4" value="${row.s4_edit}" min="0" max="${rangeMax}" data-row="${index}" data-field="s4_edit">
             </td>
             <td class="cell-currency">${formatNumber(row.unitario_bruto_tabela)}</td>
             <td class="cell-currency cell-total-linha">${formatNumber(row.totalLinha)}</td>
@@ -574,6 +604,32 @@ function renderPlanningTableBody(blockId) {
                 <input type="text" class="inline-input input-obs" value="${row.obs || ''}" placeholder="..." data-row="${index}">
             </td>
         `;
+
+        // Fix #6: Event listener for editable TT FACES (totalFaces)
+        const faceInput = tr.querySelector('.input-total-faces');
+        const validateFaceRange = (el) => {
+            const val = parseInt(el.value) || 0;
+            const min = parseInt(el.min) || 0;
+            const max = parseInt(el.max) || Infinity;
+            if (val < min || val > max) {
+                el.classList.add('input-over-range');
+                el.title = `⚠️ Fora do range permitido (Mín: ${min} | Máx: ${max})`;
+            } else {
+                el.classList.remove('input-over-range');
+                el.title = `Mín: ${min} | Máx: ${max}`;
+            }
+        };
+        faceInput.addEventListener('change', (e) => {
+            const rowIdx = parseInt(e.target.dataset.row);
+            block.planningRows[rowIdx].totalFaces = parseInt(e.target.value) || 0;
+            validateFaceRange(e.target);
+            autoAllocateFaces(block);
+            renderPlanningTableBody(blockId);
+            updateGauges(blockId);
+            updateConsolidated();
+        });
+        faceInput.addEventListener('input', validateFaceRange.bind(null, faceInput));
+        validateFaceRange(faceInput);
 
         // Inline input events for S1-S4 weeks with min/max validation
         tr.querySelectorAll('.input-s1, .input-s2, .input-s3, .input-s4').forEach(input => {
@@ -610,7 +666,6 @@ function renderPlanningTableBody(blockId) {
             // Validate immediately on render (catches pre-filled over-limit values)
             validateRange(input);
         });
-
 
         tr.querySelector('.input-neg').addEventListener('change', (e) => {
             const rowIdx = parseInt(e.target.dataset.row);
@@ -683,36 +738,25 @@ function updateGauges(blockId) {
 function updateExposureGauge(block, blockElement) {
     const rows = block.planningRows;
 
+    // Fix #5: Use range_minimo and range_maximo from the base for min/max display
     let totalMin = 0, totalMax = 0, totalMedian = 0;
 
-    // Total available faces (ideal max exposure)
-    const totalAvailableFaces = rows.reduce((s, r) => s + r.totalFaces, 0);
-
     rows.forEach(row => {
-        const weekValues = [row.s1_edit || 0, row.s2_edit || 0, row.s3_edit || 0, row.s4_edit || 0];
-        const nonZero = weekValues.filter(v => v > 0);
-        const min = nonZero.length > 0 ? Math.min(...nonZero) : 0;
-        const max = nonZero.length > 0 ? Math.max(...nonZero) : 0;
-        const sorted = [...nonZero].sort((a, b) => a - b);
-        const median = sorted.length > 0 ? sorted[Math.floor(sorted.length / 2)] : 0;
-        const minIndex = min * (row.pesos || 0.5);
-        const maxIndex = max * (row.pesos || 0.5);
-
-        totalMin += minIndex;
-        totalMax += maxIndex;
-        totalMedian += median;
+        totalMin += (row.range_minimo || 0);
+        totalMax += (row.range_maximo || row.totalFaces || 0);
+        // Median: midpoint between range_minimo and range_maximo
+        totalMedian += Math.round(((row.range_minimo || 0) + (row.range_maximo || row.totalFaces || 0)) / 2);
     });
 
-    blockElement.querySelector('.exp-total-min').textContent = totalMin.toFixed(1);
-    blockElement.querySelector('.exp-total-max').textContent = totalMax.toFixed(1);
-    blockElement.querySelector('.exp-total-median').textContent = totalMedian.toFixed(0);
+    blockElement.querySelector('.exp-total-min').textContent = totalMin;
+    blockElement.querySelector('.exp-total-max').textContent = totalMax;
+    blockElement.querySelector('.exp-total-median').textContent = totalMedian;
 
-    // Exposure gauge: total allocated faces across all weeks vs. total possible (faces × 4 weeks)
+    // Exposure gauge: total allocated faces (across all weeks) vs. total range_maximo × 4 weeks
     const totalAllocated = rows.reduce((s, r) => s + (r.s1_edit || 0) + (r.s2_edit || 0) + (r.s3_edit || 0) + (r.s4_edit || 0), 0);
-    const maxPossible = totalAvailableFaces * 4; // faces across all 4 weeks
+    const maxPossible = totalMax * 4; // range_maximo across all 4 weeks
     const exposureRatio = maxPossible > 0 ? totalAllocated / maxPossible : 0;
     const exposurePercent = Math.min(Math.max(exposureRatio * 100, 2), 98);
-    const gaugeValue = totalAllocated;
 
     blockElement.querySelector('.exp-gauge-value').textContent = `${totalAllocated} / ${maxPossible} faces`;
     const expCursor = blockElement.querySelector('.exposure-cursor');
@@ -731,13 +775,15 @@ function updateExposureGauge(block, blockElement) {
 function updateEfficiencyGauge(block, blockElement) {
     const rows = block.planningRows;
 
+    // Fix #4: Use cpf_minimo and cpf_maximo from the base
     let totalCpfMin = 0, totalCpfMax = 0;
 
     rows.forEach(row => {
         if (!row.facesUsadas || row.facesUsadas === 0) return;
 
-        totalCpfMin += row.custoFace || 0;
-        totalCpfMax += row.unitario_bruto_tabela || 0;
+        // Use base CPF values if available, fallback to computed
+        totalCpfMin += (row.cpf_minimo && row.cpf_minimo > 0) ? row.cpf_minimo : (row.custoFace || 0);
+        totalCpfMax += (row.cpf_maximo && row.cpf_maximo > 0) ? row.cpf_maximo : (row.unitario_bruto_tabela || 0);
     });
 
     blockElement.querySelector('.eff-total-min').textContent = formatNumber(totalCpfMin);
@@ -832,7 +878,7 @@ function updateBlockHints(blockId) {
         advice = "💡 A exposição está baixa para esta praça. Considere aumentar a quantidade de faces para garantir cobertura mínima, ou foque em formatos de maior impacto.";
         priority = 1;
     } else if (savingsRatio < 0.1) {
-        advice = "📉 Eficiência pode melhorar. Tente negociar pelo menos 15% de desconto para este recorte de mídia.";
+        advice = "📉 Eficiência pode melhorar. Tente negociar pelo menos 15% de desconto para este plano de mídia.";
     } else if (budgetRatio < 0.7) {
         advice = "💰 Sobrou budget significativo. Você pode aumentar a frequência (semanas) ou contratar mais faces para dominar a praça.";
         priority = 1;
@@ -866,18 +912,19 @@ function updateConsolidated() {
     } else {
         activeBlocks.forEach(block => {
             const totalFaces = block.planningRows.reduce((s, r) => s + r.totalFaces, 0);
-            const budgetIdeal = block.planningRows.reduce((s, r) => s + r.budgetIdeal, 0);
-            const statusText = budgetIdeal <= block.budget ? '✅ OK' : '⚠️ Acima';
+            const totalNeg = block.planningRows.reduce((s, r) => s + (r.ttNeg || 0), 0);
+            const totalRecomendado = block.planningRows.reduce((s, r) => s + (r.budgetIdeal || 0), 0);
+            const statusText = totalNeg <= block.budget ? '✅ OK' : '⚠️ Acima';
 
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>Mídia ${block.id}</td>
+                <td>Plano ${block.id}</td>
                 <td>${block.praca || '--'}</td>
                 <td>${block.taxonomia || '--'}</td>
                 <td>${formatCurrency(block.budget)}</td>
                 <td>${block.planningRows.length} formatos</td>
                 <td>${totalFaces}</td>
-                <td>${formatCurrency(budgetIdeal)}</td>
+                <td>${formatCurrency(totalRecomendado)}</td>
                 <td>${statusText}</td>
             `;
             tbody.appendChild(row);
@@ -1212,16 +1259,19 @@ function exportCSV() {
         return;
     }
 
-    const headers = ['Mídia', 'Veículo', 'Peso', 'Formato', 'TT Faces', 'Index', 'Digital', 'Estático', 'S1', 'S2', 'S3', 'S4', 'Tabela Unit.', 'Negociação %', 'TT Neg.', 'Budget Ideal', 'Custo/Face', 'OBS'];
+    const headers = ['Plano', 'Veículo', 'Peso', 'Formato', 'Periodicidade', 'Min', 'Max', 'TT Faces', 'Index', 'Digital', 'Estático', 'S1', 'S2', 'S3', 'S4', 'Tabela Unit.', 'Negociação %', 'TT Neg.', 'Recomendado', 'Custo/Face', 'OBS'];
 
     const rows = [];
     activeBlocks.forEach(block => {
         block.planningRows.forEach(row => {
             rows.push([
-                `Mídia ${block.id}`,
+                `Plano ${block.id}`,
                 row.exibidores || '',
                 row.pesos || '',
                 row.formato || '',
+                row.periodicidade || '',
+                row.range_minimo || 0,
+                row.range_maximo || 0,
                 row.totalFaces,
                 row.index,
                 row.digital ? 'Sim' : 'Não',
@@ -1265,6 +1315,22 @@ async function loadPlan(planId) {
             state.mediaBlocks = planData;
             state.nextBlockId = Math.max(...planData.map(b => b.id)) + 1;
             renderMediaBlocks();
+
+            // Fix #12: Re-hydrate planning data for each block from the saved state or re-fetch
+            for (const block of state.mediaBlocks) {
+                if (block.praca && block.taxonomia) {
+                    if (block.planningRows && block.planningRows.length > 0) {
+                        // Saved plan already has planningRows – just mark as active and render
+                        block.active = true;
+                        block.planningData = block.planningRows;
+                        updateBlockUI(block.id);
+                    } else {
+                        // No planning rows saved — re-fetch from the API
+                        await fetchPlanningData(block.id);
+                    }
+                }
+            }
+
             updateConsolidated();
         }
     } catch (error) {

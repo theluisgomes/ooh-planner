@@ -390,6 +390,7 @@ app.post('/api/get-planning-data', isAuthenticated, async (req, res) => {
                     formato: item.formato,
                     ranking: item.ranking,
                     pesos: item.pesos,
+                    periodicidade: item.periodicidade || null,
                     digital: 0,
                     estatico: 0,
                     totalFaces: 0,
@@ -403,6 +404,10 @@ app.post('/api/get-planning-data', isAuthenticated, async (req, res) => {
                     total_bruto_negociado: 0,
                     exposicao_unit: 0,
                     impacto_unit: 0,
+                    range_minimo: 0,
+                    range_maximo: 0,
+                    cpf_minimo: 0,
+                    cpf_maximo: 0,
                     count: 0
                 };
             }
@@ -420,6 +425,10 @@ app.post('/api/get-planning-data', isAuthenticated, async (req, res) => {
             g.total_bruto_negociado += (item.total_bruto_negociado || 0);
             g.exposicao_unit += (item.exposicao_unit || 0);
             g.impacto_unit += (item.impacto_unit || 0);
+            g.range_minimo += (item.range_minimo || 0);
+            g.range_maximo += (item.range_maximo || 0);
+            g.cpf_minimo += (item.cpf_minimo || 0);
+            g.cpf_maximo += (item.cpf_maximo || 0);
             g.count++;
         });
 
@@ -428,6 +437,8 @@ app.post('/api/get-planning-data', isAuthenticated, async (req, res) => {
             const avgTabela = g.count > 0 ? g.unitario_bruto_tabela / g.count : 0;
             const avgDesconto = g.count > 0 ? g.desconto / g.count : 0;
             const avgNegociado = g.count > 0 ? g.unitario_bruto_negociado / g.count : 0;
+            const avgCpfMin = g.count > 0 ? g.cpf_minimo / g.count : 0;
+            const avgCpfMax = g.count > 0 ? g.cpf_maximo / g.count : 0;
             const index = g.totalFaces * (g.pesos || 0.5);
 
             return {
@@ -435,6 +446,7 @@ app.post('/api/get-planning-data', isAuthenticated, async (req, res) => {
                 formato: g.formato,
                 ranking: g.ranking,
                 pesos: g.pesos,
+                periodicidade: g.periodicidade,
                 totalFaces: g.totalFaces,
                 index: Math.round(index * 100) / 100,
                 digital: g.digital,
@@ -448,7 +460,11 @@ app.post('/api/get-planning-data', isAuthenticated, async (req, res) => {
                 unitario_bruto_negociado: Math.round(avgNegociado * 100) / 100,
                 total_bruto_negociado: Math.round(g.total_bruto_negociado * 100) / 100,
                 exposicao_unit: g.exposicao_unit,
-                impacto_unit: g.impacto_unit
+                impacto_unit: g.impacto_unit,
+                range_minimo: g.range_minimo,
+                range_maximo: g.range_maximo,
+                cpf_minimo: Math.round(avgCpfMin * 100) / 100,
+                cpf_maximo: Math.round(avgCpfMax * 100) / 100
             };
         });
 

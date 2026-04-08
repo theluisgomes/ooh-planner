@@ -65,7 +65,7 @@
 
             <div class="actions-bar" style="text-align: center; margin: 2rem 0;">
                 <button id="btnAddBlock" class="btn btn-primary" onclick="addBlock()">
-                    + ADICIONAR RECORTE DE MÍDIA
+                    + ADICIONAR PLANO DE MÍDIA
                 </button>
             </div>
         </div>
@@ -102,10 +102,10 @@
                     </div>
                     <div class="kpi-card accent-purple">
                         <span class="kpi-card-label"
-                            data-tooltip="Número de recortes de mídia ativos (com praça, taxonomia e budget configurados)">Recortes
+                            data-tooltip="Número de planos de mídia ativos (com praça, ciclo e budget configurados)">Planos
                             Ativos</span>
                         <span class="kpi-card-value" id="gKpiRecortes">--</span>
-                        <span class="kpi-card-sub">blocos de mídia</span>
+                        <span class="kpi-card-sub">planos de mídia</span>
                     </div>
                 </div>
 
@@ -156,12 +156,12 @@
             </div>
 
             <div class="table-wrapper">
-                <table class="consolidated-table" id="consolidatedTable">
+                    <table class="consolidated-table" id="consolidatedTable">
                     <thead>
                         <tr>
-                            <th>Mídia</th>
+                            <th>Plano</th>
                             <th>Praça</th>
-                            <th>Taxonomia</th>
+                            <th>Ciclo</th>
                             <th>Budget</th>
                             <th>Formatos</th>
                             <th>TT Faces</th>
@@ -186,7 +186,7 @@
                 <div class="media-number">
                     <span class="number-badge">1</span>
                     <div>
-                        <h3>RECORTE DE MÍDIA</h3>
+                        <h3>PLANO DE MÍDIA</h3>
                         <p class="config-label">CONFIGURAÇÃO TÉCNICA #01</p>
                     </div>
                 </div>
@@ -225,7 +225,7 @@
                         </div>
 
                         <div class="form-group">
-                            <label>🏷️ TAXONOMIA</label>
+                            <label>🏷️ CICLO</label>
                             <select class="form-control input-taxonomia">
                                 <option value="">Selecione...</option>
                             </select>
@@ -243,7 +243,13 @@
                                     <th rowspan="2">VEÍCULO</th>
                                     <th rowspan="2">FORMATO</th>
                                     <th rowspan="2"
-                                        data-tooltip="Total de faces disponíveis no veículo (inventário máximo)">TT
+                                        data-tooltip="Periodicidade da campanha para este formato">PERIOD.</th>
+                                    <th rowspan="2"
+                                        data-tooltip="Range mínimo de faces recomendado para este formato na praça">MIN</th>
+                                    <th rowspan="2"
+                                        data-tooltip="Range máximo de faces recomendado para este formato na praça">MAX</th>
+                                    <th rowspan="2"
+                                        data-tooltip="Total de faces contratadas (editável; respeite o range MIN/MAX)">TT
                                         FACES</th>
                                     <th rowspan="2"
                                         data-tooltip="Score ponderado do veículo baseado nos pesos estratégicos da campanha">
@@ -261,7 +267,7 @@
                                         data-tooltip="Custo total negociado da linha (após desconto × faces usadas)">TT
                                         NEGOCIADO</th>
                                     <th rowspan="2"
-                                        data-tooltip="Quanto do budget total seria ideal alocar para este veículo, proporcional ao seu peso no plano">
+                                        data-tooltip="Valor bruto negociado recomendado para este formato (total_bruto_negociado da base)">
                                         RECOMENDADO</th>
                                     <th rowspan="2"
                                         data-tooltip="Preço negociado por face individual (tabela × (1 − desconto))">
@@ -281,7 +287,10 @@
                             <tfoot>
                                 <tr class="planning-totals">
                                     <td colspan="2"><strong>TOTAIS</strong></td>
+                                    <td></td>
                                     <td class="total-faces">--</td>
+                                    <td class="total-faces-max">--</td>
+                                    <td></td>
                                     <td class="total-index">--</td>
                                     <td colspan="2"></td>
                                     <td class="total-s1">--</td>
@@ -386,12 +395,12 @@
                 <button class="modal-close" id="helpModalClose">&times;</button>
             </div>
             <div class="modal-body">
-                <h3>1. Configure o recorte de mídia</h3>
+                <h3>1. Configure o plano de mídia</h3>
                 <p>Preencha os três parâmetros do bloco na seguinte ordem:</p>
                 <ul>
-                    <li><strong>Budget (R$):</strong> defina o orçamento disponível para o recorte.</li>
+                    <li><strong>Budget (R$):</strong> defina o orçamento disponível para o plano.</li>
                     <li><strong>Praça:</strong> selecione a cidade ou região do plano.</li>
-                    <li><strong>Taxonomia:</strong> escolha o tipo de produto/campanha.</li>
+                    <li><strong>Ciclo:</strong> escolha o tipo de produto/campanha.</li>
                 </ul>
                 <p>Ao preencher os três campos, o planejamento será carregado automaticamente.</p>
 

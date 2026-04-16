@@ -445,6 +445,52 @@ select.form-control {
     text-overflow: ellipsis;
 }
 
+.formato-main {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.purchase-badges {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+
+.purchase-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    border: 1px solid transparent;
+}
+
+.purchase-badge-circuito {
+    background: rgba(99, 102, 241, 0.12);
+    color: #4338ca;
+    border-color: rgba(99, 102, 241, 0.35);
+}
+
+.purchase-badge-unitario {
+    background: rgba(16, 185, 129, 0.12);
+    color: #047857;
+    border-color: rgba(16, 185, 129, 0.35);
+}
+
+.purchase-circuit-name {
+    font-size: 0.62rem;
+    color: var(--text-secondary);
+    max-width: 105px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .cell-peso {
     text-align: center;
     color: var(--secondary);

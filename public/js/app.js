@@ -48,6 +48,45 @@ function toTitleCase(str) {
     return str.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
 }
 
+function normalizeTotalFaces(row) {
+    const min = Number.isFinite(Number(row.range_minimo)) ? Number(row.range_minimo) : 0;
+    let max = Number.isFinite(Number(row.range_maximo)) ? Number(row.range_maximo) : Number(row.totalFaces || 0);
+    if (max < min) max = min;
+    const current = Number.isFinite(Number(row.totalFaces)) ? Number(row.totalFaces) : 0;
+    return Math.min(Math.max(current, min), max);
+}
+
+function distributeFacesAcrossWeeks(row, facesTotal) {
+    const totalWeight = (row.s1 || 0) + (row.s2 || 0) + (row.s3 || 0) + (row.s4 || 0);
+
+    if (totalWeight <= 0) {
+        // No base week profile: deterministic even split with remainder in S4.
+        const perWeek = Math.floor(facesTotal / 4);
+        row.s1_edit = perWeek;
+        row.s2_edit = perWeek;
+        row.s3_edit = perWeek;
+        row.s4_edit = facesTotal - (perWeek * 3);
+        return;
+    }
+
+    // Deterministic split following base week proportions (S1-S4).
+    row.s1_edit = Math.round(facesTotal * ((row.s1 || 0) / totalWeight));
+    row.s2_edit = Math.round(facesTotal * ((row.s2 || 0) / totalWeight));
+    row.s3_edit = Math.round(facesTotal * ((row.s3 || 0) / totalWeight));
+    row.s4_edit = Math.round(facesTotal * ((row.s4 || 0) / totalWeight));
+
+    // Round-fix to keep exact total.
+    const currentSum = row.s1_edit + row.s2_edit + row.s3_edit + row.s4_edit;
+    if (currentSum !== facesTotal) {
+        const diff = facesTotal - currentSum;
+        if (row.s1_edit > 0) row.s1_edit += diff;
+        else if (row.s2_edit > 0) row.s2_edit += diff;
+        else if (row.s3_edit > 0) row.s3_edit += diff;
+        else if (row.s4_edit > 0) row.s4_edit += diff;
+        else row.s1_edit += diff;
+    }
+}
+
 const state = {
     filters: {},
     nextBlockId: 2,
@@ -178,7 +217,7 @@ async function updateTaxonomiaOptions(blockElement, praca) {
 async function fetchPlanningData(blockId) {
     const block = getBlockById(blockId);
 
-    if (!block.budget || !block.taxonomia || !block.praca) {
+    if (!block.taxonomia || !block.praca) {
         block.planningData = null;
         block.planningRows = null;
         block.active = false;
@@ -217,6 +256,7 @@ async function fetchPlanningData(blockId) {
             // Initialize planningRows with editable fields
             block.planningRows = result.rows.map(row => ({
                 ...row,
+                totalFaces: normalizeTotalFaces(row),
                 // Fix #3: prefill desconto da base (base stores as decimal 0-1, e.g. 0.6 = 60%)
                 negociacao_edit: row.desconto || 0,
                 obs: '',                        // user notes
@@ -255,43 +295,11 @@ function autoAllocateFaces(block) {
     const budget = block.budget || 0;
     const rows = block.planningRows;
 
-    // Fix #2: Helper to distribute faces using s1/s2/s3/s4 proportions from base
-    // This ensures we respect the total quantity and the inventory availability pattern
-    function allocateWithWeekWeights(row, facesTotal) {
-        const totalWeight = (row.s1 || 0) + (row.s2 || 0) + (row.s3 || 0) + (row.s4 || 0);
-        if (totalWeight <= 0) {
-            // No distribution data in base — distribute evenly across 4 weeks
-            const perWeek = Math.floor(facesTotal / 4);
-            row.s1_edit = perWeek;
-            row.s2_edit = perWeek;
-            row.s3_edit = perWeek;
-            row.s4_edit = facesTotal - (perWeek * 3); // putting remainder in last week
-        } else {
-            // Distribute facesTotal following the base proportions (s1/s2/s3/s4)
-            row.s1_edit = Math.round(facesTotal * ((row.s1 || 0) / totalWeight));
-            row.s2_edit = Math.round(facesTotal * ((row.s2 || 0) / totalWeight));
-            row.s3_edit = Math.round(facesTotal * ((row.s3 || 0) / totalWeight));
-            row.s4_edit = Math.round(facesTotal * ((row.s4 || 0) / totalWeight));
-
-            // Small adjustment to ensure sum equals exactly facesTotal due to rounding
-            const currentSum = row.s1_edit + row.s2_edit + row.s3_edit + row.s4_edit;
-            if (currentSum !== facesTotal) {
-                const diff = facesTotal - currentSum;
-                // Add diff to the first non-zero week or s1
-                if (row.s1_edit > 0) row.s1_edit += diff;
-                else if (row.s2_edit > 0) row.s2_edit += diff;
-                else if (row.s3_edit > 0) row.s3_edit += diff;
-                else if (row.s4_edit > 0) row.s4_edit += diff;
-                else row.s1_edit += diff;
-            }
-        }
-    }
-
     // Total cost at full capacity (all faces, no discounts)
     const totalMaxCost = rows.reduce((sum, r) => sum + r.unitario_bruto_tabela * r.totalFaces, 0);
 
-    if (totalMaxCost <= 0 || budget <= 0) {
-        // No budget or no cost data — set all to 0
+    if (totalMaxCost <= 0) {
+        // No cost data — set all to 0
         rows.forEach(row => {
             row.s1_edit = 0; row.s2_edit = 0; row.s3_edit = 0; row.s4_edit = 0;
         });
@@ -299,10 +307,10 @@ function autoAllocateFaces(block) {
         return;
     }
 
-    if (budget >= totalMaxCost) {
-        // Budget covers everything — allocate all available faces with week weights
+    if (!budget || budget <= 0 || budget >= totalMaxCost) {
+        // No budget set (show 100% planned) or budget covers everything — allocate all faces
         rows.forEach(row => {
-            allocateWithWeekWeights(row, row.totalFaces);
+            distributeFacesAcrossWeeks(row, row.totalFaces);
         });
     } else {
         // Budget is limited — allocate proportionally, weighted by ranking (pesos)
@@ -326,7 +334,7 @@ function autoAllocateFaces(block) {
             const allocated = Math.min(maxAffordable, row.totalFaces);
 
             // Fix #2: distribute allocated faces using week weights
-            allocateWithWeekWeights(row, allocated);
+            distributeFacesAcrossWeeks(row, allocated);
 
             remainingBudget -= row.unitario_bruto_tabela * allocated;
         });
@@ -335,13 +343,13 @@ function autoAllocateFaces(block) {
         if (remainingBudget > 0) {
             for (const { row } of indexed) {
                 if (remainingBudget <= 0) break;
-                const currentFaces = Math.max(row.s1_edit, row.s2_edit, row.s3_edit, row.s4_edit);
+                const currentFaces = (row.s1_edit || 0) + (row.s2_edit || 0) + (row.s3_edit || 0) + (row.s4_edit || 0);
                 const canAdd = row.totalFaces - currentFaces;
                 if (canAdd > 0 && row.unitario_bruto_tabela > 0) {
                     const extraAffordable = Math.floor(remainingBudget / row.unitario_bruto_tabela);
                     const extra = Math.min(extraAffordable, canAdd);
                     if (extra > 0) {
-                        allocateWithWeekWeights(row, currentFaces + extra);
+                        distributeFacesAcrossWeeks(row, currentFaces + extra);
                         remainingBudget -= row.unitario_bruto_tabela * extra;
                     }
                 }
@@ -362,6 +370,8 @@ function recalculatePlanningRows(block) {
         // Faces being used = sum of S1-S4 (total units across the period)
         // Base distributes 'quantidade' into s1/s2/s3/s4, so the sum is the total count.
         row.facesUsadas = (row.s1_edit || 0) + (row.s2_edit || 0) + (row.s3_edit || 0) + (row.s4_edit || 0);
+        // Keep TT Faces aligned with weekly distribution to avoid inconsistencies in the table.
+        row.totalFaces = row.facesUsadas;
 
         // Total Linha = tabela unit. × faces being used
         row.totalLinha = row.unitario_bruto_tabela * row.facesUsadas;
@@ -563,13 +573,20 @@ function renderPlanningTableBody(blockId) {
         tr.className = index < 3 ? `priority-rank-${index + 1}` : '';
 
         const negPct = row.negociacao_edit ? (row.negociacao_edit * 100).toFixed(0) : '0';
+        const tipoCompra = row.circuito ? 'CIRCUITO' : 'UNITÁRIO';
         // Fix #5/#6: range bounds from base
         const rangeMin = row.range_minimo || 0;
         const rangeMax = row.range_maximo || row.totalFaces;
 
         tr.innerHTML = `
             <td class="cell-veiculo">${row.exibidores || '--'}</td>
-            <td class="cell-formato">${row.formato || '--'}</td>
+            <td class="cell-formato">
+                <div class="formato-main">${row.formato || '--'}</div>
+                <div class="purchase-badges">
+                    <span class="purchase-badge ${row.circuito ? 'purchase-badge-circuito' : 'purchase-badge-unitario'}">${tipoCompra}</span>
+                    ${row.circuito ? `<span class="purchase-circuit-name">${row.circuito}</span>` : ''}
+                </div>
+            </td>
             <td class="cell-periodo">${row.periodicidade || '--'}</td>
             <td class="cell-number range-min">${rangeMin}</td>
             <td class="cell-number range-max">${rangeMax}</td>
@@ -621,9 +638,14 @@ function renderPlanningTableBody(blockId) {
         };
         faceInput.addEventListener('change', (e) => {
             const rowIdx = parseInt(e.target.dataset.row);
-            block.planningRows[rowIdx].totalFaces = parseInt(e.target.value) || 0;
+            const row = block.planningRows[rowIdx];
+            row.totalFaces = parseInt(e.target.value) || 0;
+            row.totalFaces = normalizeTotalFaces(row);
+            e.target.value = row.totalFaces;
             validateFaceRange(e.target);
-            autoAllocateFaces(block);
+            // Predictable manual edit: only this line is redistributed by week profile.
+            distributeFacesAcrossWeeks(row, row.totalFaces);
+            recalculatePlanningRows(block);
             renderPlanningTableBody(blockId);
             updateGauges(blockId);
             updateConsolidated();
@@ -650,6 +672,11 @@ function renderPlanningTableBody(blockId) {
                 block.planningRows[rowIdx][field] = parseInt(e.target.value) || 0;
                 validateRange(e.target);
                 recalculatePlanningRows(block);
+                const totalFacesInput = tr.querySelector('.input-total-faces');
+                if (totalFacesInput) {
+                    totalFacesInput.value = block.planningRows[rowIdx].totalFaces;
+                    validateFaceRange(totalFacesInput);
+                }
                 updatePlanningTotals(blockId);
                 updateGauges(blockId);
                 updateConsolidated();
@@ -660,6 +687,11 @@ function renderPlanningTableBody(blockId) {
                 block.planningRows[rowIdx][field] = parseInt(e.target.value) || 0;
                 validateRange(e.target);
                 recalculatePlanningRows(block);
+                const totalFacesInput = tr.querySelector('.input-total-faces');
+                if (totalFacesInput) {
+                    totalFacesInput.value = block.planningRows[rowIdx].totalFaces;
+                    validateFaceRange(totalFacesInput);
+                }
                 updatePlanningTotals(blockId);
                 updateGauges(blockId);
             });
@@ -697,6 +729,8 @@ function updatePlanningTotals(blockId) {
     const rows = block.planningRows;
     const totals = {
         pesoFmt: rows.reduce((s, r) => s + (r.pesos || 0), 0),
+        rangeMin: rows.reduce((s, r) => s + (r.range_minimo || 0), 0),
+        rangeMax: rows.reduce((s, r) => s + (r.range_maximo || r.totalFaces || 0), 0),
         faces: rows.reduce((s, r) => s + r.totalFaces, 0),
         index: rows.reduce((s, r) => s + r.index, 0),
         s1: rows.reduce((s, r) => s + (r.s1_edit || 0), 0),
@@ -710,7 +744,9 @@ function updatePlanningTotals(blockId) {
         custoFace: rows.reduce((s, r) => s + r.custoFace, 0)
     };
 
-    blockElement.querySelector('.total-faces').textContent = totals.faces;
+    blockElement.querySelector('.total-faces').textContent = totals.rangeMin;
+    blockElement.querySelector('.total-faces-max').textContent = totals.rangeMax;
+    blockElement.querySelector('.total-tt-faces').textContent = totals.faces;
     blockElement.querySelector('.total-index').textContent = totals.index.toFixed(2);
     blockElement.querySelector('.total-s1').textContent = totals.s1;
     blockElement.querySelector('.total-s2').textContent = totals.s2;
@@ -752,9 +788,9 @@ function updateExposureGauge(block, blockElement) {
     blockElement.querySelector('.exp-total-max').textContent = totalMax;
     blockElement.querySelector('.exp-total-median').textContent = totalMedian;
 
-    // Exposure gauge: total allocated faces (across all weeks) vs. total range_maximo × 4 weeks
+    // Exposure gauge: allocated faces vs. total maximum capacity in the current cycle.
     const totalAllocated = rows.reduce((s, r) => s + (r.s1_edit || 0) + (r.s2_edit || 0) + (r.s3_edit || 0) + (r.s4_edit || 0), 0);
-    const maxPossible = totalMax * 4; // range_maximo across all 4 weeks
+    const maxPossible = totalMax;
     const exposureRatio = maxPossible > 0 ? totalAllocated / maxPossible : 0;
     const exposurePercent = Math.min(Math.max(exposureRatio * 100, 2), 98);
 
@@ -798,9 +834,9 @@ function updateEfficiencyGauge(block, blockElement) {
     // 1) Negotiation savings: primary driver (0 to 100%)
     const savingsRatio = totalTabela > 0 ? 1 - (totalNeg / totalTabela) : 0;
     
-    // 2) Budget Adherence: penalty if over budget
+    // 2) Budget Adherence: penalty if over budget (only applies when budget is set)
     const budgetRatio = budget > 0 ? totalNeg / budget : 0;
-    const overBudget = budgetRatio > 1.05; // 5% grace margin
+    const overBudget = budget > 0 && budgetRatio > 1.05; // 5% grace margin
 
     // Calculate efficiency score:
     // Base score is savings % × 100 (e.g. 30% savings = 60 efficiency score baseline)
@@ -862,7 +898,7 @@ function updateBlockHints(blockId) {
     const totalNeg = block.planningRows.reduce((s, r) => s + r.ttNeg, 0);
     const totalTabela = block.planningRows.reduce((s, r) => s + r.totalLinha, 0);
     const facesAllocated = block.planningRows.reduce((s, r) => s + (r.s1_edit || 0) + (r.s2_edit || 0) + (r.s3_edit || 0) + (r.s4_edit || 0), 0);
-    const totalAvailable = block.planningRows.reduce((s, r) => s + r.totalFaces * 4, 0);
+    const totalAvailable = block.planningRows.reduce((s, r) => s + (r.range_maximo || r.totalFaces || 0), 0);
 
     const savingsRatio = totalTabela > 0 ? 1 - (totalNeg / totalTabela) : 0;
     const exposureRatio = totalAvailable > 0 ? facesAllocated / totalAvailable : 0;
@@ -1259,7 +1295,7 @@ function exportCSV() {
         return;
     }
 
-    const headers = ['Plano', 'Veículo', 'Peso', 'Formato', 'Periodicidade', 'Min', 'Max', 'TT Faces', 'Index', 'Digital', 'Estático', 'S1', 'S2', 'S3', 'S4', 'Tabela Unit.', 'Negociação %', 'TT Neg.', 'Recomendado', 'Custo/Face', 'OBS'];
+    const headers = ['Plano', 'Veículo', 'Peso', 'Formato', 'Circuito', 'Periodicidade', 'Min', 'Max', 'TT Faces', 'Index', 'Digital', 'Estático', 'S1', 'S2', 'S3', 'S4', 'Tabela Unit.', 'Negociação %', 'TT Neg.', 'Recomendado', 'Custo/Face', 'OBS'];
 
     const rows = [];
     activeBlocks.forEach(block => {
@@ -1269,6 +1305,7 @@ function exportCSV() {
                 row.exibidores || '',
                 row.pesos || '',
                 row.formato || '',
+                row.circuito || '',
                 row.periodicidade || '',
                 row.range_minimo || 0,
                 row.range_maximo || 0,
@@ -1321,6 +1358,10 @@ async function loadPlan(planId) {
                 if (block.praca && block.taxonomia) {
                     if (block.planningRows && block.planningRows.length > 0) {
                         // Saved plan already has planningRows – just mark as active and render
+                        block.planningRows.forEach(row => {
+                            row.totalFaces = normalizeTotalFaces(row);
+                        });
+                        recalculatePlanningRows(block);
                         block.active = true;
                         block.planningData = block.planningRows;
                         updateBlockUI(block.id);

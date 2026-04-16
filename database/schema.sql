@@ -12,6 +12,8 @@ CREATE TABLE inventory (
     exibidores TEXT NOT NULL,
     cluster_formato TEXT,
     formato TEXT NOT NULL,
+    circuito TEXT,
+    avulso INTEGER NOT NULL DEFAULT 0,
     estatico INTEGER NOT NULL DEFAULT 0,
     digital INTEGER NOT NULL DEFAULT 0,
     range_minimo INTEGER,

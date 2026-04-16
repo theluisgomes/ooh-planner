@@ -12,7 +12,7 @@ const XLSX = require('xlsx');
 const Database = require('better-sqlite3');
 
 const DB_PATH = path.join(__dirname, 'ooh_planner.db');
-const EXCEL_PATH = path.join(__dirname, '../Datasets/Planilhas OOH PLANNER_enviadas_ Pesos.xlsx');
+const EXCEL_PATH = path.join(__dirname, '../Datasets/Planilhas OOH PLANNER_enviadas_2026-03-23.xlsx');
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 
 // Standard column order in PLAN sheets (by position index)
@@ -23,23 +23,25 @@ const COL_MAP = [
     'praca',                  // 3
     'exibidores',             // 4
     'formato',                // 5
-    'ranking',                // 6 - sometimes called 'ranking formato'
-    'pesos',                  // 7
-    'estatico',               // 8 - "X" or null
-    'digital',                // 9 - "X" or null
-    'range_minimo',           // 10
-    'range_maximo',           // 11
-    'quantidade',             // 12
-    'periodicidade',          // 13
-    's1',                     // 14
-    's2',                     // 15
-    's3',                     // 16
-    's4',                     // 17
-    'flight',                 // 18
-    'unitario_bruto_tabela',  // 19
-    'desconto',               // 20
-    'unitario_bruto_negociado', // 21
-    'total_bruto_negociado'   // 22
+    'circuito',               // 6 - circuit identifier (new)
+    'avulso',                 // 7 - "X" or null (new)
+    'ranking',                // 8 - sometimes called 'ranking formato'
+    'pesos',                  // 9
+    'estatico',               // 10 - "X" or null
+    'digital',                // 11 - "X" or null
+    'range_minimo',           // 12
+    'range_maximo',           // 13
+    'quantidade',             // 14
+    'periodicidade',          // 15
+    's1',                     // 16
+    's2',                     // 17
+    's3',                     // 18
+    's4',                     // 19
+    'flight',                 // 20
+    'unitario_bruto_tabela',  // 21
+    'desconto',               // 22
+    'unitario_bruto_negociado', // 23
+    'total_bruto_negociado'   // 24
 ];
 
 function importExcel() {
@@ -95,6 +97,7 @@ function importExcel() {
         INSERT INTO inventory (
             taxonomia, regional_boticario, uf, praca,
             exibidores, formato,
+            circuito, avulso,
             ranking, pesos,
             estatico, digital,
             range_minimo, range_maximo, quantidade,
@@ -103,6 +106,7 @@ function importExcel() {
             unitario_bruto_negociado, total_bruto_negociado
         ) VALUES (
             ?, ?, ?, ?,
+            ?, ?,
             ?, ?,
             ?, ?,
             ?, ?,
@@ -134,9 +138,13 @@ function importExcel() {
                 // Skip empty/header rows
                 if (!praca || praca === 'praca' || !formato) continue;
 
+                // Circuito / Avulso (new columns at indices 6 and 7)
+                const circuito = row[6] ? String(row[6]).trim() : null;
+                const avulso = (String(row[7] || '').trim().toUpperCase() === 'X') ? 1 : 0;
+
                 // Ranking: must be integer 1-12
                 let ranking = null;
-                const rawRanking = row[6];
+                const rawRanking = row[8];
                 if (typeof rawRanking === 'number' && Number.isInteger(rawRanking) && rawRanking >= 1 && rawRanking <= 12) {
                     ranking = rawRanking;
                 }
@@ -146,15 +154,15 @@ function importExcel() {
                 if (ranking !== null && pesosLookup[ranking] !== undefined) {
                     pesos = pesosLookup[ranking];
                 } else {
-                    const rawPesos = row[7];
+                    const rawPesos = row[9];
                     if (typeof rawPesos === 'number' && rawPesos > 0 && rawPesos <= 1) {
                         pesos = rawPesos;
                     }
                 }
 
                 // Estatico/Digital: "X" → 1, anything else → 0
-                const estatico = (String(row[8] || '').trim().toUpperCase() === 'X') ? 1 : 0;
-                const digital = (String(row[9] || '').trim().toUpperCase() === 'X') ? 1 : 0;
+                const estatico = (String(row[10] || '').trim().toUpperCase() === 'X') ? 1 : 0;
+                const digital = (String(row[11] || '').trim().toUpperCase() === 'X') ? 1 : 0;
 
                 // Numeric fields
                 const parseNum = (v) => {
@@ -171,19 +179,19 @@ function importExcel() {
                     return isNaN(n) ? null : n;
                 };
 
-                const range_minimo = parseIntSafe(row[10]);
-                const range_maximo = parseIntSafe(row[11]);
-                const quantidade = parseIntSafe(row[12]);
-                const periodicidade = row[13] ? String(row[13]).trim() : null;
-                const s1 = parseIntSafe(row[14]) || 0;
-                const s2 = parseIntSafe(row[15]) || 0;
-                const s3 = parseIntSafe(row[16]) || 0;
-                const s4 = parseIntSafe(row[17]) || 0;
-                const flight = parseIntSafe(row[18]) || 1;
-                const unitario_bruto_tabela = parseNum(row[19]);
-                const desconto = parseNum(row[20]);
-                const unitario_bruto_negociado = parseNum(row[21]);
-                const total_bruto_negociado = parseNum(row[22]);
+                const range_minimo = parseIntSafe(row[12]);
+                const range_maximo = parseIntSafe(row[13]);
+                const quantidade = parseIntSafe(row[14]);
+                const periodicidade = row[15] ? String(row[15]).trim() : null;
+                const s1 = parseIntSafe(row[16]) || 0;
+                const s2 = parseIntSafe(row[17]) || 0;
+                const s3 = parseIntSafe(row[18]) || 0;
+                const s4 = parseIntSafe(row[19]) || 0;
+                const flight = parseIntSafe(row[20]) || 1;
+                const unitario_bruto_tabela = parseNum(row[21]);
+                const desconto = parseNum(row[22]);
+                const unitario_bruto_negociado = parseNum(row[23]);
+                const total_bruto_negociado = parseNum(row[24]);
 
                 // Skip rows without price data
                 if (unitario_bruto_tabela === null) continue;
@@ -191,6 +199,7 @@ function importExcel() {
                 insert.run(
                     taxonomia, regional, uf, praca,
                     exibidores, formato,
+                    circuito, avulso,
                     ranking, pesos,
                     estatico, digital,
                     range_minimo, range_maximo, quantidade,

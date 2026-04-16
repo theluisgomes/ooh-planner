@@ -388,6 +388,7 @@ app.post('/api/get-planning-data', isAuthenticated, async (req, res) => {
                 groups[key] = {
                     exibidores: item.exibidores,
                     formato: item.formato,
+                    circuito: item.circuito || null,
                     ranking: item.ranking,
                     pesos: item.pesos,
                     periodicidade: item.periodicidade || null,
@@ -406,12 +407,13 @@ app.post('/api/get-planning-data', isAuthenticated, async (req, res) => {
                     impacto_unit: 0,
                     range_minimo: 0,
                     range_maximo: 0,
-                    cpf_minimo: 0,
-                    cpf_maximo: 0,
                     count: 0
                 };
             }
             const g = groups[key];
+            if (!g.circuito && item.circuito) {
+                g.circuito = item.circuito;
+            }
             g.totalFaces += (item.quantidade || 0);
             g.s1 += (item.s1 || 0);
             g.s2 += (item.s2 || 0);
@@ -427,8 +429,6 @@ app.post('/api/get-planning-data', isAuthenticated, async (req, res) => {
             g.impacto_unit += (item.impacto_unit || 0);
             g.range_minimo += (item.range_minimo || 0);
             g.range_maximo += (item.range_maximo || 0);
-            g.cpf_minimo += (item.cpf_minimo || 0);
-            g.cpf_maximo += (item.cpf_maximo || 0);
             g.count++;
         });
 
@@ -437,13 +437,15 @@ app.post('/api/get-planning-data', isAuthenticated, async (req, res) => {
             const avgTabela = g.count > 0 ? g.unitario_bruto_tabela / g.count : 0;
             const avgDesconto = g.count > 0 ? g.desconto / g.count : 0;
             const avgNegociado = g.count > 0 ? g.unitario_bruto_negociado / g.count : 0;
-            const avgCpfMin = g.count > 0 ? g.cpf_minimo / g.count : 0;
-            const avgCpfMax = g.count > 0 ? g.cpf_maximo / g.count : 0;
+            // cpf_minimo/cpf_maximo don't exist in the schema; derive from negotiated/table prices
+            const avgCpfMin = avgNegociado;
+            const avgCpfMax = avgTabela;
             const index = g.totalFaces * (g.pesos || 0.5);
 
             return {
                 exibidores: g.exibidores,
                 formato: g.formato,
+                circuito: g.circuito,
                 ranking: g.ranking,
                 pesos: g.pesos,
                 periodicidade: g.periodicidade,

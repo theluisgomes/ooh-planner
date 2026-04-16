@@ -545,8 +545,6 @@ class BigQueryService {
             params.estatico = filters.estatico === 'Sim' ? 1 : 0;
         }
 
-        query += ' LIMIT 100';
-
         const [rows] = await this.bigquery.query({ query, params });
         return rows;
     }

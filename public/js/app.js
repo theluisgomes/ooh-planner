@@ -1041,7 +1041,11 @@ function updateBlockHints(blockId) {
 function updateConsolidated() {
     const activeBlocks = state.mediaBlocks.filter(b => b.active && b.planningRows);
 
-    const totalBudget = activeBlocks.reduce((sum, b) => sum + (b.budget || 0), 0);
+    const totalBudget = activeBlocks.reduce((sum, b) => {
+        const hasBudget = b.budget && b.budget > 0;
+        const recomendado = (b.planningRows || []).reduce((s, r) => s + (r.budgetIdeal || 0), 0);
+        return sum + (hasBudget ? b.budget : recomendado);
+    }, 0);
     document.getElementById('totalCard').textContent = formatCurrency(totalBudget);
 
     const tbody = document.getElementById('consolidatedTableBody');

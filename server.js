@@ -407,6 +407,8 @@ app.post('/api/get-planning-data', isAuthenticated, async (req, res) => {
                     impacto_unit: 0,
                     range_minimo: 0,
                     range_maximo: 0,
+                    cpf_min_neg: Infinity,
+                    cpf_max_tab: 0,
                     count: 0
                 };
             }
@@ -429,6 +431,9 @@ app.post('/api/get-planning-data', isAuthenticated, async (req, res) => {
             g.impacto_unit += (item.impacto_unit || 0);
             g.range_minimo += (item.range_minimo || 0);
             g.range_maximo += (item.range_maximo || 0);
+            // Track true min/max cost-per-face across grouped records
+            if (item.unitario_bruto_negociado > 0) g.cpf_min_neg = Math.min(g.cpf_min_neg, item.unitario_bruto_negociado);
+            if (item.unitario_bruto_tabela > 0) g.cpf_max_tab = Math.max(g.cpf_max_tab, item.unitario_bruto_tabela);
             g.count++;
         });
 
@@ -437,9 +442,9 @@ app.post('/api/get-planning-data', isAuthenticated, async (req, res) => {
             const avgTabela = g.count > 0 ? g.unitario_bruto_tabela / g.count : 0;
             const avgDesconto = g.count > 0 ? g.desconto / g.count : 0;
             const avgNegociado = g.count > 0 ? g.unitario_bruto_negociado / g.count : 0;
-            // cpf_minimo/cpf_maximo don't exist in the schema; derive from negotiated/table prices
-            const avgCpfMin = avgNegociado;
-            const avgCpfMax = avgTabela;
+            // cpf: use the true min (lowest negotiated price) and max (highest table price) across records
+            const cpfMin = g.cpf_min_neg === Infinity ? avgNegociado : g.cpf_min_neg;
+            const cpfMax = g.cpf_max_tab > 0 ? g.cpf_max_tab : avgTabela;
             const index = g.totalFaces * (g.pesos || 0.5);
 
             return {
@@ -465,8 +470,8 @@ app.post('/api/get-planning-data', isAuthenticated, async (req, res) => {
                 impacto_unit: g.impacto_unit,
                 range_minimo: g.range_minimo,
                 range_maximo: g.range_maximo,
-                cpf_minimo: Math.round(avgCpfMin * 100) / 100,
-                cpf_maximo: Math.round(avgCpfMax * 100) / 100
+                cpf_minimo: Math.round(cpfMin * 100) / 100,
+                cpf_maximo: Math.round(cpfMax * 100) / 100
             };
         });
 

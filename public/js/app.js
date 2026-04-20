@@ -50,9 +50,11 @@ function toTitleCase(str) {
 
 function normalizeTotalFaces(row) {
     const min = Number.isFinite(Number(row.range_minimo)) ? Number(row.range_minimo) : 0;
-    let max = Number.isFinite(Number(row.range_maximo)) ? Number(row.range_maximo) : Number(row.totalFaces || 0);
-    if (max < min) max = min;
     const current = Number.isFinite(Number(row.totalFaces)) ? Number(row.totalFaces) : 0;
+    const rawMax = Number(row.range_maximo);
+    // When range_maximo is 0/null, fall back to raw quantity so rows are not zeroed out
+    let max = (Number.isFinite(rawMax) && rawMax > 0) ? rawMax : Math.max(current, min);
+    if (max < min) max = min;
     return Math.min(Math.max(current, min), max);
 }
 
@@ -254,22 +256,28 @@ async function fetchPlanningData(blockId) {
             block.active = true;
 
             // Initialize planningRows with editable fields
-            block.planningRows = result.rows.map(row => ({
-                ...row,
-                totalFaces: normalizeTotalFaces(row),
-                // Fix #3: prefill desconto da base (base stores as decimal 0-1, e.g. 0.6 = 60%)
-                negociacao_edit: row.desconto || 0,
-                obs: '',                        // user notes
-                s1_edit: 0,
-                s2_edit: 0,
-                s3_edit: 0,
-                s4_edit: 0,
-                facesUsadas: 0,
-                budgetIdeal: 0,
-                custoFace: 0,
-                ttNeg: 0,
-                totalLinha: 0
-            }));
+            block.planningRows = result.rows.map(row => {
+                const rawMax = Number(row.range_maximo);
+                const rawQty = Number(row.totalFaces) || 0;
+                // maxFaces = stable capacity reference, never overwritten by recalculation
+                const maxFaces = (Number.isFinite(rawMax) && rawMax > 0) ? rawMax : rawQty;
+                return {
+                    ...row,
+                    totalFaces: normalizeTotalFaces(row),
+                    maxFaces,
+                    negociacao_edit: row.desconto || 0,
+                    obs: '',
+                    s1_edit: 0,
+                    s2_edit: 0,
+                    s3_edit: 0,
+                    s4_edit: 0,
+                    facesUsadas: 0,
+                    budgetIdeal: 0,
+                    custoFace: 0,
+                    ttNeg: 0,
+                    totalLinha: 0
+                };
+            });
 
             // Auto-optimize face allocation based on budget
             autoAllocateFaces(block);
@@ -290,69 +298,141 @@ async function fetchPlanningData(blockId) {
 // ============================================
 // AUTO-ALLOCATION: distributes faces to fit budget
 // ============================================
+// Pricing rules:
+// - CIRCUITO rows are all-or-nothing: buying means paying the whole package
+//   (unitario_bruto_tabela × range_maximo) and activating every face in the
+//   circuit. The allocator either activates the full circuit or skips it.
+// - UNITÁRIO rows are per-face: each additional face costs unitario_bruto_tabela.
+// ============================================
 function autoAllocateFaces(block) {
     if (!block.planningRows) return;
     const budget = block.budget || 0;
     const rows = block.planningRows;
 
-    // Total cost at full capacity (all faces, no discounts)
-    const totalMaxCost = rows.reduce((sum, r) => sum + r.unitario_bruto_tabela * r.totalFaces, 0);
+    // Stable capacity = range_maximo when available, otherwise maxFaces (set at init and never overwritten)
+    const getCapacity = (row) => {
+        const rMax = Number(row.range_maximo);
+        return (Number.isFinite(rMax) && rMax > 0) ? rMax : (row.maxFaces || 0);
+    };
+
+    const getFacesCount = (row) =>
+        (row.s1_edit || 0) + (row.s2_edit || 0) + (row.s3_edit || 0) + (row.s4_edit || 0);
+
+    const isCircuito = (row) => !!row.circuito;
+
+    // Reset all allocations before recomputing
+    rows.forEach(row => {
+        row.s1_edit = 0; row.s2_edit = 0; row.s3_edit = 0; row.s4_edit = 0;
+    });
+
+    // Total cost at MAX capacity (all rows fully allocated)
+    const totalMaxCost = rows.reduce((sum, r) => sum + r.unitario_bruto_tabela * getCapacity(r), 0);
 
     if (totalMaxCost <= 0) {
-        // No cost data — set all to 0
+        recalculatePlanningRows(block);
+        return;
+    }
+
+    // No budget constraint or budget covers full MAX: allocate everything
+    if (!budget || budget <= 0 || budget >= totalMaxCost) {
         rows.forEach(row => {
-            row.s1_edit = 0; row.s2_edit = 0; row.s3_edit = 0; row.s4_edit = 0;
+            distributeFacesAcrossWeeks(row, getCapacity(row));
         });
         recalculatePlanningRows(block);
         return;
     }
 
-    if (!budget || budget <= 0 || budget >= totalMaxCost) {
-        // No budget set (show 100% planned) or budget covers everything — allocate all faces
-        rows.forEach(row => {
-            distributeFacesAcrossWeeks(row, row.totalFaces);
-        });
-    } else {
-        // Budget is limited — allocate proportionally, weighted by ranking (pesos)
-        const totalWeight = rows.reduce((sum, r) => sum + (r.pesos || 0.5), 0);
-        let remainingBudget = budget;
+    // Budget-limited allocation — sort by priority descending (peso)
+    const indexed = rows.map((r, i) => ({ row: r, idx: i }))
+                       .sort((a, b) => (b.row.pesos || 0) - (a.row.pesos || 0));
 
-        // Sort by pesos descending (highest priority first)
-        const indexed = rows.map((r, i) => ({ row: r, idx: i }));
-        indexed.sort((a, b) => (b.row.pesos || 0) - (a.row.pesos || 0));
+    let remainingBudget = budget;
 
-        // First pass: allocate proportionally by weight
-        indexed.forEach(({ row }) => {
-            if (remainingBudget <= 0 || row.unitario_bruto_tabela <= 0) {
-                row.s1_edit = 0; row.s2_edit = 0; row.s3_edit = 0; row.s4_edit = 0;
-                return;
+    // Pass 0: CIRCUITOS (all-or-nothing) in priority order
+    // Each circuit is bought fully at unitario_bruto_tabela × capacity, or skipped.
+    for (const { row } of indexed) {
+        if (remainingBudget <= 0) break;
+        if (!isCircuito(row)) continue;
+        const capacity = getCapacity(row);
+        const packageCost = row.unitario_bruto_tabela * capacity;
+        if (packageCost > 0 && packageCost <= remainingBudget && capacity > 0) {
+            distributeFacesAcrossWeeks(row, capacity);
+            remainingBudget -= packageCost;
+        }
+    }
+
+    // Pass 1: guarantee range_minimo for each UNITÁRIO row (highest priority first)
+    for (const { row } of indexed) {
+        if (remainingBudget <= 0) break;
+        if (isCircuito(row)) continue;
+        if (getFacesCount(row) > 0) continue;
+        const minFaces = row.range_minimo || 0;
+        if (minFaces > 0 && row.unitario_bruto_tabela > 0) {
+            const canAfford = Math.floor(remainingBudget / row.unitario_bruto_tabela);
+            const allocMin = Math.min(canAfford, minFaces);
+            if (allocMin > 0) {
+                distributeFacesAcrossWeeks(row, allocMin);
+                remainingBudget -= row.unitario_bruto_tabela * allocMin;
             }
+        }
+    }
 
-            const weightShare = (row.pesos || 0.5) / totalWeight;
-            const rowBudget = budget * weightShare;
-            const maxAffordable = Math.floor(rowBudget / row.unitario_bruto_tabela);
-            const allocated = Math.min(maxAffordable, row.totalFaces);
+    // Pass 1.5: guarantee at least 1 face for every zeroed UNITÁRIO that still fits
+    // Prevents expensive rows (e.g. empenas) from staying zeroed when budget allows.
+    for (const { row } of indexed) {
+        if (remainingBudget <= 0) break;
+        if (isCircuito(row)) continue;
+        if (getFacesCount(row) > 0) continue;
+        if (row.unitario_bruto_tabela <= 0) continue;
+        const capacity = getCapacity(row);
+        if (capacity <= 0) continue;
+        if (row.unitario_bruto_tabela <= remainingBudget) {
+            distributeFacesAcrossWeeks(row, 1);
+            remainingBudget -= row.unitario_bruto_tabela;
+        }
+    }
 
-            // Fix #2: distribute allocated faces using week weights
-            distributeFacesAcrossWeeks(row, allocated);
-
-            remainingBudget -= row.unitario_bruto_tabela * allocated;
-        });
-
-        // Second pass: distribute remaining budget from top priority
-        if (remainingBudget > 0) {
-            for (const { row } of indexed) {
-                if (remainingBudget <= 0) break;
-                const currentFaces = (row.s1_edit || 0) + (row.s2_edit || 0) + (row.s3_edit || 0) + (row.s4_edit || 0);
-                const canAdd = row.totalFaces - currentFaces;
-                if (canAdd > 0 && row.unitario_bruto_tabela > 0) {
-                    const extraAffordable = Math.floor(remainingBudget / row.unitario_bruto_tabela);
-                    const extra = Math.min(extraAffordable, canAdd);
-                    if (extra > 0) {
-                        distributeFacesAcrossWeeks(row, currentFaces + extra);
-                        remainingBudget -= row.unitario_bruto_tabela * extra;
-                    }
+    // Pass 2: distribute remaining budget proportionally (by pesos) to UNITÁRIOS up to MAX
+    if (remainingBudget > 0) {
+        const unitarios = indexed.filter(({ row }) => !isCircuito(row));
+        const totalWeight = unitarios.reduce((sum, { row }) => sum + (row.pesos || 0.5), 0);
+        if (totalWeight > 0) {
+            unitarios.forEach(({ row }) => {
+                if (remainingBudget <= 0 || row.unitario_bruto_tabela <= 0) return;
+                const capacity = getCapacity(row);
+                const currentFaces = getFacesCount(row);
+                const canAdd = capacity - currentFaces;
+                if (canAdd <= 0) return;
+                const weightShare = (row.pesos || 0.5) / totalWeight;
+                const extra = Math.min(
+                    Math.floor(remainingBudget * weightShare / row.unitario_bruto_tabela),
+                    canAdd
+                );
+                if (extra > 0) {
+                    distributeFacesAcrossWeeks(row, currentFaces + extra);
+                    remainingBudget -= row.unitario_bruto_tabela * extra;
                 }
+            });
+        }
+    }
+
+    // Pass 3: fill highest-priority UNITÁRIOS up to MAX with any leftover budget
+    if (remainingBudget > 0) {
+        for (const { row } of indexed) {
+            if (remainingBudget <= 0) break;
+            if (isCircuito(row)) continue;
+            if (row.unitario_bruto_tabela <= 0) continue;
+            const capacity = getCapacity(row);
+            const currentFaces = getFacesCount(row);
+            const canAdd = capacity - currentFaces;
+            if (canAdd <= 0) continue;
+            const extra = Math.min(
+                Math.floor(remainingBudget / row.unitario_bruto_tabela),
+                canAdd
+            );
+            if (extra > 0) {
+                distributeFacesAcrossWeeks(row, currentFaces + extra);
+                remainingBudget -= row.unitario_bruto_tabela * extra;
             }
         }
     }
@@ -728,11 +808,11 @@ function updatePlanningTotals(blockId) {
 
     const rows = block.planningRows;
     const totals = {
-        pesoFmt: rows.reduce((s, r) => s + (r.pesos || 0), 0),
-        rangeMin: rows.reduce((s, r) => s + (r.range_minimo || 0), 0),
-        rangeMax: rows.reduce((s, r) => s + (r.range_maximo || r.totalFaces || 0), 0),
-        faces: rows.reduce((s, r) => s + r.totalFaces, 0),
-        index: rows.reduce((s, r) => s + r.index, 0),
+        pesoFmt: rows.reduce((s, r) => s + (Number(r.pesos) || 0), 0),
+        rangeMin: rows.reduce((s, r) => s + (Number(r.range_minimo) || 0), 0),
+        rangeMax: rows.reduce((s, r) => s + (Number(r.range_maximo) > 0 ? Number(r.range_maximo) : (Number(r.maxFaces) || 0)), 0),
+        faces: rows.reduce((s, r) => s + (Number(r.totalFaces) || 0), 0),
+        index: rows.reduce((s, r) => s + (Number(r.index) || 0), 0),
         s1: rows.reduce((s, r) => s + (r.s1_edit || 0), 0),
         s2: rows.reduce((s, r) => s + (r.s2_edit || 0), 0),
         s3: rows.reduce((s, r) => s + (r.s3_edit || 0), 0),
@@ -778,10 +858,12 @@ function updateExposureGauge(block, blockElement) {
     let totalMin = 0, totalMax = 0, totalMedian = 0;
 
     rows.forEach(row => {
-        totalMin += (row.range_minimo || 0);
-        totalMax += (row.range_maximo || row.totalFaces || 0);
+        const rowMin = Number(row.range_minimo) || 0;
+        const rowMax = Number(row.range_maximo) > 0 ? Number(row.range_maximo) : (Number(row.maxFaces) || 0);
+        totalMin += rowMin;
+        totalMax += rowMax;
         // Median: midpoint between range_minimo and range_maximo
-        totalMedian += Math.round(((row.range_minimo || 0) + (row.range_maximo || row.totalFaces || 0)) / 2);
+        totalMedian += Math.round((rowMin + rowMax) / 2);
     });
 
     blockElement.querySelector('.exp-total-min').textContent = totalMin;
@@ -811,19 +893,26 @@ function updateExposureGauge(block, blockElement) {
 function updateEfficiencyGauge(block, blockElement) {
     const rows = block.planningRows;
 
-    // Fix #4: Use cpf_minimo and cpf_maximo from the base
-    let totalCpfMin = 0, totalCpfMax = 0;
+    // CPF range across active rows: MIN of cpf_minimo and MAX of cpf_maximo
+    // (sum would produce a meaningless aggregate that inflates with row count).
+    let cpfMin = Infinity, cpfMax = 0;
+    let hasActiveRow = false;
 
     rows.forEach(row => {
         if (!row.facesUsadas || row.facesUsadas === 0) return;
+        hasActiveRow = true;
 
-        // Use base CPF values if available, fallback to computed
-        totalCpfMin += (row.cpf_minimo && row.cpf_minimo > 0) ? row.cpf_minimo : (row.custoFace || 0);
-        totalCpfMax += (row.cpf_maximo && row.cpf_maximo > 0) ? row.cpf_maximo : (row.unitario_bruto_tabela || 0);
+        const rowCpfMin = (row.cpf_minimo && row.cpf_minimo > 0) ? row.cpf_minimo : (row.custoFace || 0);
+        const rowCpfMax = (row.cpf_maximo && row.cpf_maximo > 0) ? row.cpf_maximo : (row.unitario_bruto_tabela || 0);
+
+        if (rowCpfMin > 0) cpfMin = Math.min(cpfMin, rowCpfMin);
+        if (rowCpfMax > 0) cpfMax = Math.max(cpfMax, rowCpfMax);
     });
 
-    blockElement.querySelector('.eff-total-min').textContent = formatNumber(totalCpfMin);
-    blockElement.querySelector('.eff-total-max').textContent = formatNumber(totalCpfMax);
+    if (!hasActiveRow || cpfMin === Infinity) cpfMin = 0;
+
+    blockElement.querySelector('.eff-total-min').textContent = formatNumber(cpfMin);
+    blockElement.querySelector('.eff-total-max').textContent = formatNumber(cpfMax);
 
     // Efficiency gauge: composite of budget utilization + negotiation savings
     const budget = block.budget || 0;

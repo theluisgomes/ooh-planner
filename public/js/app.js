@@ -548,7 +548,6 @@ function setupBlockListeners(blockElement, blockId) {
     const taxonomiaSelect = blockElement.querySelector('.input-taxonomia');
     taxonomiaSelect.addEventListener('change', (e) => {
         getBlockById(blockId).taxonomia = e.target.value || null;
-        fetchPlanningData(blockId);
     });
 
     const pracaSelect = blockElement.querySelector('.input-praca');
@@ -562,8 +561,24 @@ function setupBlockListeners(blockElement, blockId) {
         // If taxonomia was reset (no longer valid for new praça), update block state
         const taxonomiaSelect = blockElement.querySelector('.input-taxonomia');
         block.taxonomia = taxonomiaSelect.value || null;
+    });
 
-        fetchPlanningData(blockId);
+    const generateBtn = blockElement.querySelector('.btn-generate');
+    generateBtn.addEventListener('click', () => {
+        const blk = getBlockById(blockId);
+        // Sync current select values into block state before generating
+        blk.praca = blockElement.querySelector('.input-praca').value || null;
+        blk.taxonomia = blockElement.querySelector('.input-taxonomia').value || null;
+        if (!blk.praca || !blk.taxonomia) {
+            alert('Por favor, seleccione a Praça e o Ciclo antes de gerar o plano.');
+            return;
+        }
+        generateBtn.disabled = true;
+        generateBtn.textContent = '⏳ A gerar…';
+        fetchPlanningData(blockId).finally(() => {
+            generateBtn.disabled = false;
+            generateBtn.textContent = '▶ Gerar Plano';
+        });
     });
 
     const deleteBtn = blockElement.querySelector('.btn-delete');

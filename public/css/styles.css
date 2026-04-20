@@ -307,6 +307,41 @@ body {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: var(--spacing-md);
+    align-items: end;
+}
+
+.label-invisible {
+    visibility: hidden;
+}
+
+.btn-generate {
+    width: 100%;
+    padding: 0.5rem 1rem;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
+    white-space: nowrap;
+}
+
+.btn-generate:hover {
+    background: var(--primary-dark);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-generate:active {
+    transform: scale(0.97);
+}
+
+.btn-generate:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
 }
 
 .form-group {

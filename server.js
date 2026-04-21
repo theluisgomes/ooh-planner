@@ -380,15 +380,34 @@ app.post('/api/get-planning-data', isAuthenticated, async (req, res) => {
             });
         }
 
-        // Group by exibidores + formato
+        // Detect circuit/package rows:
+        // A row is a circuit if it has a circuito field, if formato contains 'circuito', 'pacote', or
+        // 'full', OR if quantidade == 1 while range_minimo == range_maximo and that value > 1
+        // (meaning 1 buyable unit = many faces).
+        const detectCircuito = (item) => {
+            if (item.circuito) return item.circuito;
+            const fLower = (item.formato || '').toLowerCase();
+            if (fLower.includes('circuito') || fLower.includes('pacote') || fLower.includes(' full')) {
+                return item.formato;
+            }
+            const rMin = item.range_minimo;
+            const rMax = item.range_maximo;
+            const qty  = item.quantidade;
+            if (qty === 1 && rMin > 1 && rMin === rMax) return item.formato;
+            return null;
+        };
+
+        // Group by exibidores + formato + material type
         const groups = {};
         inventory.forEach(item => {
-            const key = `${item.exibidores}|||${item.formato}`;
+            const materialType = item.digital ? 'DIG' : (item.estatico ? 'EST' : 'N/A');
+            const key = `${item.exibidores}|||${item.formato}|||${materialType}`;
             if (!groups[key]) {
+                const detectedCircuito = detectCircuito(item);
                 groups[key] = {
                     exibidores: item.exibidores,
                     formato: item.formato,
-                    circuito: item.circuito || null,
+                    circuito: detectedCircuito,
                     ranking: item.ranking,
                     pesos: item.pesos,
                     periodicidade: item.periodicidade || null,
@@ -413,8 +432,8 @@ app.post('/api/get-planning-data', isAuthenticated, async (req, res) => {
                 };
             }
             const g = groups[key];
-            if (!g.circuito && item.circuito) {
-                g.circuito = item.circuito;
+            if (!g.circuito) {
+                g.circuito = detectCircuito(item);
             }
             g.totalFaces += (item.quantidade || 0);
             g.s1 += (item.s1 || 0);
@@ -447,6 +466,16 @@ app.post('/api/get-planning-data', isAuthenticated, async (req, res) => {
             const cpfMax = g.cpf_max_tab > 0 ? g.cpf_max_tab : avgTabela;
             const index = g.totalFaces * (g.pesos || 0.5);
 
+            // For circuit/package rows, the base purchase unit contains `range_maximo` faces.
+            // e.g. Salvador "Pacote Full": range_min = range_max = 63 → 1 circuit = 63 faces.
+            // For unitary rows, each face is an independent purchase unit → fpu = 1.
+            let facesPorUnidade = 1;
+            if (g.circuito && g.range_maximo > 0) {
+                // Per group, range_maximo was summed across records; divide back by count.
+                facesPorUnidade = Math.round(g.range_maximo / g.count);
+                if (facesPorUnidade < 1) facesPorUnidade = 1;
+            }
+
             return {
                 exibidores: g.exibidores,
                 formato: g.formato,
@@ -471,7 +500,8 @@ app.post('/api/get-planning-data', isAuthenticated, async (req, res) => {
                 range_minimo: g.range_minimo,
                 range_maximo: g.range_maximo,
                 cpf_minimo: Math.round(cpfMin * 100) / 100,
-                cpf_maximo: Math.round(cpfMax * 100) / 100
+                cpf_maximo: Math.round(cpfMax * 100) / 100,
+                faces_por_unidade: Math.round(facesPorUnidade)
             };
         });
 

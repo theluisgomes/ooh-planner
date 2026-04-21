@@ -320,13 +320,20 @@ function autoAllocateFaces(block) {
 
     const isCircuito = (row) => !!row.circuito;
 
+    // For circuits: unitario_bruto_tabela is the price per circuit-unit (not per face).
+    // fpu (faces per unit) = how many faces compose 1 buyable unit.
+    // For unitário rows fpu = 1, so cost = tabela × faces.
+    const getFpu = (row) => (row.circuito && row.faces_por_unidade > 0) ? row.faces_por_unidade : 1;
+    // Row cost = tabela × (capacity / fpu) → number of circuit-units at max capacity
+    const getRowCost = (row) => row.unitario_bruto_tabela * (getCapacity(row) / getFpu(row));
+
     // Reset all allocations before recomputing
     rows.forEach(row => {
         row.s1_edit = 0; row.s2_edit = 0; row.s3_edit = 0; row.s4_edit = 0;
     });
 
     // Total cost at MAX capacity (all rows fully allocated)
-    const totalMaxCost = rows.reduce((sum, r) => sum + r.unitario_bruto_tabela * getCapacity(r), 0);
+    const totalMaxCost = rows.reduce((sum, r) => sum + getRowCost(r), 0);
 
     if (totalMaxCost <= 0) {
         recalculatePlanningRows(block);
@@ -349,12 +356,15 @@ function autoAllocateFaces(block) {
     let remainingBudget = budget;
 
     // Pass 0: CIRCUITOS (all-or-nothing) in priority order
-    // Each circuit is bought fully at unitario_bruto_tabela × capacity, or skipped.
+    // unitario_bruto_tabela = price per circuit-unit. capacity is in faces.
+    // Cost of 1 full circuit = unitario_bruto_tabela × (capacity / fpu) circuit-units.
     for (const { row } of indexed) {
         if (remainingBudget <= 0) break;
         if (!isCircuito(row)) continue;
         const capacity = getCapacity(row);
-        const packageCost = row.unitario_bruto_tabela * capacity;
+        const fpu = getFpu(row);
+        const numCircuits = Math.round(capacity / fpu);
+        const packageCost = row.unitario_bruto_tabela * numCircuits;
         if (packageCost > 0 && packageCost <= remainingBudget && capacity > 0) {
             distributeFacesAcrossWeeks(row, capacity);
             remainingBudget -= packageCost;
@@ -368,17 +378,18 @@ function autoAllocateFaces(block) {
         if (getFacesCount(row) > 0) continue;
         const minFaces = row.range_minimo || 0;
         if (minFaces > 0 && row.unitario_bruto_tabela > 0) {
-            const canAfford = Math.floor(remainingBudget / row.unitario_bruto_tabela);
+            const fpu = getFpu(row);
+            const costPerFace = row.unitario_bruto_tabela / fpu;
+            const canAfford = Math.floor(remainingBudget / costPerFace);
             const allocMin = Math.min(canAfford, minFaces);
             if (allocMin > 0) {
                 distributeFacesAcrossWeeks(row, allocMin);
-                remainingBudget -= row.unitario_bruto_tabela * allocMin;
+                remainingBudget -= costPerFace * allocMin;
             }
         }
     }
 
     // Pass 1.5: guarantee at least 1 face for every zeroed UNITÁRIO that still fits
-    // Prevents expensive rows (e.g. empenas) from staying zeroed when budget allows.
     for (const { row } of indexed) {
         if (remainingBudget <= 0) break;
         if (isCircuito(row)) continue;
@@ -386,9 +397,11 @@ function autoAllocateFaces(block) {
         if (row.unitario_bruto_tabela <= 0) continue;
         const capacity = getCapacity(row);
         if (capacity <= 0) continue;
-        if (row.unitario_bruto_tabela <= remainingBudget) {
+        const fpu = getFpu(row);
+        const costPerFace = row.unitario_bruto_tabela / fpu;
+        if (costPerFace <= remainingBudget) {
             distributeFacesAcrossWeeks(row, 1);
-            remainingBudget -= row.unitario_bruto_tabela;
+            remainingBudget -= costPerFace;
         }
     }
 
@@ -403,14 +416,16 @@ function autoAllocateFaces(block) {
                 const currentFaces = getFacesCount(row);
                 const canAdd = capacity - currentFaces;
                 if (canAdd <= 0) return;
+                const fpu = getFpu(row);
+                const costPerFace = row.unitario_bruto_tabela / fpu;
                 const weightShare = (row.pesos || 0.5) / totalWeight;
                 const extra = Math.min(
-                    Math.floor(remainingBudget * weightShare / row.unitario_bruto_tabela),
+                    Math.floor(remainingBudget * weightShare / costPerFace),
                     canAdd
                 );
                 if (extra > 0) {
                     distributeFacesAcrossWeeks(row, currentFaces + extra);
-                    remainingBudget -= row.unitario_bruto_tabela * extra;
+                    remainingBudget -= costPerFace * extra;
                 }
             });
         }
@@ -426,13 +441,15 @@ function autoAllocateFaces(block) {
             const currentFaces = getFacesCount(row);
             const canAdd = capacity - currentFaces;
             if (canAdd <= 0) continue;
+            const fpu = getFpu(row);
+            const costPerFace = row.unitario_bruto_tabela / fpu;
             const extra = Math.min(
-                Math.floor(remainingBudget / row.unitario_bruto_tabela),
+                Math.floor(remainingBudget / costPerFace),
                 canAdd
             );
             if (extra > 0) {
                 distributeFacesAcrossWeeks(row, currentFaces + extra);
-                remainingBudget -= row.unitario_bruto_tabela * extra;
+                remainingBudget -= costPerFace * extra;
             }
         }
     }
@@ -453,12 +470,17 @@ function recalculatePlanningRows(block) {
         // Keep TT Faces aligned with weekly distribution to avoid inconsistencies in the table.
         row.totalFaces = row.facesUsadas;
 
-        // Total Linha = tabela unit. × faces being used
-        row.totalLinha = row.unitario_bruto_tabela * row.facesUsadas;
+        // Total Linha = bruto_tabela * multiplicador de unidades
+        const multiplicador = (row.circuito && row.faces_por_unidade > 0) ? (row.facesUsadas / row.faces_por_unidade) : row.facesUsadas;
+        row.totalLinha = row.unitario_bruto_tabela * multiplicador;
 
         // Custo/Face = negotiated price per single face
         const disc = row.negociacao_edit || 0;
-        row.custoFace = Math.round(row.unitario_bruto_tabela * (1 - disc) * 100) / 100;
+        let baseValueForFace = row.unitario_bruto_tabela;
+        if (row.circuito && row.faces_por_unidade > 0) {
+            baseValueForFace = row.unitario_bruto_tabela / row.faces_por_unidade;
+        }
+        row.custoFace = Math.round(baseValueForFace * (1 - disc) * 100) / 100;
 
         // TT Neg. = total negotiated cost for this row = custoFace × faces
         row.ttNeg = Math.round(row.custoFace * row.facesUsadas * 100) / 100;
@@ -678,8 +700,7 @@ function renderPlanningTableBody(blockId) {
             <td class="cell-formato">
                 <div class="formato-main">${row.formato || '--'}</div>
                 <div class="purchase-badges">
-                    <span class="purchase-badge ${row.circuito ? 'purchase-badge-circuito' : 'purchase-badge-unitario'}">${tipoCompra}</span>
-                    ${row.circuito ? `<span class="purchase-circuit-name">${row.circuito}</span>` : ''}
+                    <span class="purchase-badge ${row.circuito ? 'purchase-badge-circuito' : 'purchase-badge-unitario'}" title="${row.circuito ? `Pacote: ${row.faces_por_unidade} face(s)/unidade` : 'Preço por face'}">${tipoCompra}</span>
                 </div>
             </td>
             <td class="cell-periodo">${row.periodicidade || '--'}</td>
@@ -689,8 +710,11 @@ function renderPlanningTableBody(blockId) {
                 <input type="number" class="inline-input input-total-faces" value="${row.totalFaces}" min="${rangeMin}" max="${rangeMax}" data-row="${index}" title="Mín: ${rangeMin} | Máx: ${rangeMax}">
             </td>
             <td class="cell-number">${row.index}</td>
-            <td class="cell-material"><span class="material-dot ${row.digital ? 'digital' : 'off'}"></span>DIG</td>
-            <td class="cell-material"><span class="material-dot ${row.estatico ? 'estatico' : 'off'}"></span>EST</td>
+            <td class="cell-material">
+                ${row.digital
+                    ? '<span class="material-badge material-badge-digital">📺 DIG</span>'
+                    : '<span class="material-badge material-badge-estatico">🪟 EST</span>'}
+            </td>
             <td class="cell-week">
                 <input type="number" class="inline-input input-s1" value="${row.s1_edit}" min="0" max="${rangeMax}" data-row="${index}" data-field="s1_edit">
             </td>
@@ -703,14 +727,16 @@ function renderPlanningTableBody(blockId) {
             <td class="cell-week">
                 <input type="number" class="inline-input input-s4" value="${row.s4_edit}" min="0" max="${rangeMax}" data-row="${index}" data-field="s4_edit">
             </td>
-            <td class="cell-currency">${formatNumber(row.unitario_bruto_tabela)}</td>
+            <td class="cell-currency cell-tabela-unit">
+                <input type="number" class="inline-input input-tabela-unit" value="${row.unitario_bruto_tabela}" min="0" step="0.01" data-row="${index}" title="Tabela Unitário (editável)">
+            </td>
             <td class="cell-currency cell-total-linha">${formatNumber(row.totalLinha)}</td>
             <td class="cell-neg">
                 <input type="number" class="inline-input input-neg" value="${negPct}" min="0" max="100" data-row="${index}">
                 <span class="neg-pct">%</span>
             </td>
             <td class="cell-currency">${formatNumber(row.ttNeg)}</td>
-            <td class="cell-currency cell-budget-ideal">${formatNumber(row.budgetIdeal)}</td>
+            <td class="cell-currency cell-budget-ideal">${formatNumber((row.ttNeg || 0) * 0.8)}</td>
             <td class="cell-currency">${formatNumber(row.custoFace)}</td>
             <td class="cell-obs">
                 <input type="text" class="inline-input input-obs" value="${row.obs || ''}" placeholder="..." data-row="${index}">
@@ -798,6 +824,17 @@ function renderPlanningTableBody(blockId) {
             const rowIdx = parseInt(e.target.dataset.row);
             const pct = parseFloat(e.target.value) || 0;
             block.planningRows[rowIdx].negociacao_edit = pct / 100;
+            recalculatePlanningRows(block);
+            renderPlanningTableBody(blockId);
+            updateGauges(blockId);
+            updateConsolidated();
+        });
+
+        // Tabela Unitária editável
+        tr.querySelector('.input-tabela-unit').addEventListener('change', (e) => {
+            const rowIdx = parseInt(e.target.dataset.row);
+            const val = parseFloat(e.target.value) || 0;
+            block.planningRows[rowIdx].unitario_bruto_tabela = val;
             recalculatePlanningRows(block);
             renderPlanningTableBody(blockId);
             updateGauges(blockId);
@@ -1057,7 +1094,7 @@ function updateConsolidated() {
         activeBlocks.forEach(block => {
             const totalFaces = block.planningRows.reduce((s, r) => s + r.totalFaces, 0);
             const totalNeg = block.planningRows.reduce((s, r) => s + (r.ttNeg || 0), 0);
-            const totalRecomendado = block.planningRows.reduce((s, r) => s + (r.budgetIdeal || 0), 0);
+            const totalRecomendado = block.planningRows.reduce((s, r) => s + (r.ttNeg || 0), 0) * 0.8;
             const statusText = totalNeg <= block.budget ? '✅ OK' : '⚠️ Acima';
 
             const row = document.createElement('tr');
@@ -1145,17 +1182,25 @@ function renderGlobalDashboard() {
         }
     };
 
+    // Helper: sort a group object by value descending, return {labels, values}
+    const sortedEntries = (groups) => {
+        const entries = Object.entries(groups).sort((a, b) => b[1] - a[1]);
+        return { labels: entries.map(e => e[0]), values: entries.map(e => e[1]) };
+    };
+
     // — Chart 1: Doughnut by Formato —
     const formatoGroups = {};
     allRows.forEach(r => { const k = r.formato || 'Outros'; formatoGroups[k] = (formatoGroups[k] || 0) + r.ttNeg; });
-    const fmtLabels = Object.keys(formatoGroups);
+    const fmtSorted = sortedEntries(formatoGroups);
+    const fmtLabels = fmtSorted.labels;
+    const fmtValues = fmtSorted.values;
     const fmtCanvas = document.getElementById('gChartFormato');
     if (fmtCanvas) {
         globalCharts.push(new Chart(fmtCanvas.getContext('2d'), {
             type: 'doughnut',
             data: {
                 labels: fmtLabels,
-                datasets: [{ data: Object.values(formatoGroups), backgroundColor: chartColors, borderWidth: 2, borderColor: '#fff' }]
+                datasets: [{ data: fmtValues, backgroundColor: chartColors, borderWidth: 2, borderColor: '#fff' }]
             },
             options: doughnutOpts
         }));
@@ -1164,20 +1209,22 @@ function renderGlobalDashboard() {
     // — Chart 2: Doughnut by Exibidor —
     const exibGroups = {};
     allRows.forEach(r => { const k = r.exibidores || 'Outros'; exibGroups[k] = (exibGroups[k] || 0) + r.ttNeg; });
-    const exibLabels = Object.keys(exibGroups);
+    const exibSorted = sortedEntries(exibGroups);
+    const exibLabels = exibSorted.labels;
+    const exibValues = exibSorted.values;
     const exibCanvas = document.getElementById('gChartExibidor');
     if (exibCanvas) {
         globalCharts.push(new Chart(exibCanvas.getContext('2d'), {
             type: 'doughnut',
             data: {
                 labels: exibLabels,
-                datasets: [{ data: Object.values(exibGroups), backgroundColor: chartColors, borderWidth: 2, borderColor: '#fff' }]
+                datasets: [{ data: exibValues, backgroundColor: chartColors, borderWidth: 2, borderColor: '#fff' }]
             },
             options: doughnutOpts
         }));
     }
 
-    // — Chart 3: Horizontal Bar — Investment by Formato —
+    // — Chart 3: Horizontal Bar — Investment by Formato (sorted desc) —
     const barCanvas = document.getElementById('gChartBarFormato');
     if (barCanvas) {
         globalCharts.push(new Chart(barCanvas.getContext('2d'), {
@@ -1185,7 +1232,7 @@ function renderGlobalDashboard() {
             data: {
                 labels: fmtLabels,
                 datasets: [{
-                    data: Object.values(formatoGroups),
+                    data: fmtValues,
                     backgroundColor: chartColors.slice(0, fmtLabels.length).map(c => c + 'CC'),
                     borderColor: chartColors.slice(0, fmtLabels.length),
                     borderWidth: 1,
@@ -1403,7 +1450,7 @@ function exportCSV() {
         return;
     }
 
-    const headers = ['Plano', 'Veículo', 'Peso', 'Formato', 'Circuito', 'Periodicidade', 'Min', 'Max', 'TT Faces', 'Index', 'Digital', 'Estático', 'S1', 'S2', 'S3', 'S4', 'Tabela Unit.', 'Negociação %', 'TT Neg.', 'Recomendado', 'Custo/Face', 'OBS'];
+    const headers = ['Plano', 'Veículo', 'Peso', 'Formato', 'Circuito', 'Periodicidade', 'Min', 'Max', 'TT Faces', 'Index', 'Tipo Material', 'S1', 'S2', 'S3', 'S4', 'Tabela Unit.', 'Negociação %', 'TT Neg.', 'Valor Líquido', 'Custo/Face', 'OBS'];
 
     const rows = [];
     activeBlocks.forEach(block => {
@@ -1419,8 +1466,7 @@ function exportCSV() {
                 row.range_maximo || 0,
                 row.totalFaces,
                 row.index,
-                row.digital ? 'Sim' : 'Não',
-                row.estatico ? 'Sim' : 'Não',
+                row.digital ? 'DIGITAL' : 'ESTÁTICO',
                 row.s1_edit || 0,
                 row.s2_edit || 0,
                 row.s3_edit || 0,
@@ -1428,7 +1474,7 @@ function exportCSV() {
                 row.unitario_bruto_tabela,
                 ((row.negociacao_edit || 0) * 100).toFixed(0) + '%',
                 row.ttNeg,
-                row.budgetIdeal,
+                (row.ttNeg || 0) * 0.8,
                 row.custoFace,
                 row.obs || ''
             ]);

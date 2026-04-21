@@ -583,26 +583,31 @@ select.form-control {
     pointer-events: none;
 }
 
-/* Material dot indicator */
-.material-dot {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    margin-right: 3px;
-    vertical-align: middle;
+/* Material badge pills */
+.material-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    border: 1px solid transparent;
+    white-space: nowrap;
 }
 
-.material-dot.digital {
-    background: #2D572C;
+.material-badge-digital {
+    background: rgba(14, 165, 233, 0.12);
+    color: #0369a1;
+    border-color: rgba(14, 165, 233, 0.35);
 }
 
-.material-dot.estatico {
-    background: #7B7B7B;
-}
-
-.material-dot.off {
-    background: #E0E0E0;
+.material-badge-estatico {
+    background: rgba(100, 116, 139, 0.12);
+    color: #475569;
+    border-color: rgba(100, 116, 139, 0.35);
 }
 
 /* Inline inputs */
@@ -636,6 +641,11 @@ select.form-control {
 .input-neg {
     max-width: 50px;
     padding-right: 14px;
+}
+
+.input-tabela-unit {
+    max-width: 90px;
+    text-align: right;
 }
 
 .input-obs {

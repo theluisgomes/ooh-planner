@@ -9,7 +9,7 @@ const sqliteService = require('./services/sqlite-service'); // Fallback
 const authService = require('./services/auth-service');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 // const DB_PATH = path.join(__dirname, 'database/ooh_planner.db'); // Removed
 
 // Initialize Auth Service
@@ -392,7 +392,7 @@ app.post('/api/get-planning-data', isAuthenticated, async (req, res) => {
             }
             const rMin = item.range_minimo;
             const rMax = item.range_maximo;
-            const qty  = item.quantidade;
+            const qty = item.quantidade;
             if (qty === 1 && rMin > 1 && rMin === rMax) return item.formato;
             return null;
         };

@@ -1122,8 +1122,9 @@ function updateConsolidated() {
 let globalCharts = []; // chart instances for cleanup
 
 function renderGlobalDashboard() {
+    const wrapper = document.getElementById('analyticsPanelWrapper');
     const dashboard = document.getElementById('globalDashboard');
-    if (!dashboard) return;
+    if (!wrapper || !dashboard) return;
 
     // Aggregate rows from ALL active blocks
     const allRows = [];
@@ -1136,10 +1137,10 @@ function renderGlobalDashboard() {
     const activeBlocks = state.mediaBlocks.filter(b => b.active && b.planningRows).length;
 
     if (activeBlocks === 0) {
-        dashboard.style.display = 'none';
+        wrapper.style.display = 'none';
         return;
     }
-    dashboard.style.display = 'block';
+    wrapper.style.display = 'block';
 
     // — KPI values —
     const totalFaces = allRows.reduce((s, r) => s + r.facesUsadas, 0);
@@ -1320,13 +1321,12 @@ function renderMap() {
     const activeBlocks = state.mediaBlocks.filter(b => b.active && b.planningRows);
     const mapSection = document.getElementById('mapSection');
     const mapContainer = document.getElementById('mapContainer');
+    const wrapper = document.getElementById('analyticsPanelWrapper');
 
     if (activeBlocks.length === 0) {
-        if (mapSection) mapSection.style.display = 'none';
+        // Map panel is hidden via the wrapper; nothing extra needed
         return;
     }
-
-    mapSection.style.display = 'block';
 
     // Collect praça data with totals
     const pracaData = {};
@@ -1346,7 +1346,13 @@ function renderMap() {
         mapInstance = null;
     }
 
-    mapInstance = L.map(mapContainer).setView([-14.2350, -51.9253], 4);
+    // Always show Brazil fully — fixed center + zoom
+    mapInstance = L.map(mapContainer, {
+        center: [-14.2350, -51.9253],
+        zoom: 4,
+        zoomControl: true,
+        scrollWheelZoom: false
+    });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors',
         maxZoom: 18
@@ -1370,13 +1376,13 @@ function renderMap() {
             .bindPopup(`<b>${data.label}</b><br>Investimento: ${formatCurrency(data.cost)}<br>Faces: ${data.faces}`);
     });
 
-    // Fit bounds if markers exist
-    const validCoords = Object.keys(pracaData)
-        .map(p => PRACA_COORDS[p])
-        .filter(Boolean);
-    if (validCoords.length > 0) {
-        mapInstance.fitBounds(validCoords, { padding: [30, 30], maxZoom: 8 });
-    }
+    // Force Leaflet to recalculate dimensions after layout paint, then re-center on Brazil
+    setTimeout(() => {
+        if (mapInstance) {
+            mapInstance.invalidateSize();
+            mapInstance.setView([-14.2350, -51.9253], 4);
+        }
+    }, 150);
 }
 
 // ============================================

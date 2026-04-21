@@ -71,78 +71,83 @@
         </div>
     </main>
 
-    <!-- Global Analytics Dashboard -->
-    <section id="globalDashboard" style="display: none;">
+    <!-- Analytics + Map Side-by-Side Panel -->
+    <div id="analyticsPanelWrapper" style="display: none;">
         <div class="container">
-            <div class="charts-section">
-                <h4 class="section-title">📊 Análise Global / Share</h4>
+            <div class="analytics-map-grid">
 
-                <!-- KPI stat cards -->
-                <div class="kpi-cards-row">
-                    <div class="kpi-card accent-blue">
-                        <span class="kpi-card-label"
-                            data-tooltip="Soma de todas as faces negociadas em todos os recortes ativos">Total de
-                            Faces</span>
-                        <span class="kpi-card-value" id="gKpiFaces">--</span>
-                        <span class="kpi-card-sub">faces negociadas</span>
-                    </div>
-                    <div class="kpi-card accent-green">
-                        <span class="kpi-card-label"
-                            data-tooltip="Soma do custo total negociado (TT NEG.) em todos os recortes ativos">Investimento
-                            Total</span>
-                        <span class="kpi-card-value" id="gKpiInvest">--</span>
-                        <span class="kpi-card-sub">custo negociado</span>
-                    </div>
-                    <div class="kpi-card accent-teal">
-                        <span class="kpi-card-label"
-                            data-tooltip="Investimento Total ÷ Total de Faces. Indica o custo médio por cada face contratada no plano">CPF
-                            Médio</span>
-                        <span class="kpi-card-value" id="gKpiCpf">--</span>
-                        <span class="kpi-card-sub">custo por face</span>
-                    </div>
-                    <div class="kpi-card accent-purple">
-                        <span class="kpi-card-label"
-                            data-tooltip="Número de planos de mídia ativos (com praça, ciclo e budget configurados)">Planos
-                            Ativos</span>
-                        <span class="kpi-card-value" id="gKpiRecortes">--</span>
-                        <span class="kpi-card-sub">planos de mídia</span>
-                    </div>
-                </div>
+                <!-- LEFT: Analytics Dashboard -->
+                <section id="globalDashboard">
+                    <div class="charts-section">
+                        <h4 class="section-title">📊 Análise Global / Share</h4>
 
-                <!-- charts row: donut + donut + bar -->
-                <div class="charts-grid">
-                    <div class="chart-card">
-                        <span class="chart-card-title">Share por Formato</span>
-                        <div class="chart-canvas-wrap">
-                            <canvas id="gChartFormato"></canvas>
+                        <!-- KPI stat cards -->
+                        <div class="kpi-cards-row">
+                            <div class="kpi-card accent-blue">
+                                <span class="kpi-card-label"
+                                    data-tooltip="Soma de todas as faces negociadas em todos os recortes ativos">Total de Faces</span>
+                                <span class="kpi-card-value" id="gKpiFaces">--</span>
+                                <span class="kpi-card-sub">faces negociadas</span>
+                            </div>
+                            <div class="kpi-card accent-green">
+                                <span class="kpi-card-label"
+                                    data-tooltip="Soma do custo total negociado (TT NEG.) em todos os recortes ativos">Investimento Total</span>
+                                <span class="kpi-card-value" id="gKpiInvest">--</span>
+                                <span class="kpi-card-sub">custo negociado</span>
+                            </div>
+                            <div class="kpi-card accent-teal">
+                                <span class="kpi-card-label"
+                                    data-tooltip="Investimento Total ÷ Total de Faces. Indica o custo médio por cada face contratada no plano">CPF Médio</span>
+                                <span class="kpi-card-value" id="gKpiCpf">--</span>
+                                <span class="kpi-card-sub">custo por face</span>
+                            </div>
+                            <div class="kpi-card accent-purple">
+                                <span class="kpi-card-label"
+                                    data-tooltip="Número de planos de mídia ativos (com praça, ciclo e budget configurados)">Planos Ativos</span>
+                                <span class="kpi-card-value" id="gKpiRecortes">--</span>
+                                <span class="kpi-card-sub">planos de mídia</span>
+                            </div>
+                        </div>
+
+                        <!-- charts: two donuts stacked, then bar -->
+                        <div class="charts-grid-left">
+                            <div class="donuts-row">
+                                <div class="chart-card">
+                                    <span class="chart-card-title">Share por Formato</span>
+                                    <div class="chart-canvas-wrap chart-canvas-sm">
+                                        <canvas id="gChartFormato"></canvas>
+                                    </div>
+                                </div>
+                                <div class="chart-card">
+                                    <span class="chart-card-title">Share por Exibidor</span>
+                                    <div class="chart-canvas-wrap chart-canvas-sm">
+                                        <canvas id="gChartExibidor"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="chart-card chart-card-bar">
+                                <span class="chart-card-title">Investimento por Formato (R$)</span>
+                                <div class="chart-canvas-wrap chart-canvas-bar">
+                                    <canvas id="gChartBarFormato"></canvas>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="chart-card">
-                        <span class="chart-card-title">Share por Exibidor</span>
-                        <div class="chart-canvas-wrap">
-                            <canvas id="gChartExibidor"></canvas>
+                </section>
+
+                <!-- RIGHT: Fixed Brazil Map -->
+                <section class="map-section" id="mapSection">
+                    <div class="map-panel">
+                        <div class="map-panel-header">
+                            <h2>🗺️ Distribuição Geográfica</h2>
                         </div>
+                        <div id="mapContainer"></div>
                     </div>
-                    <div class="chart-card">
-                        <span class="chart-card-title">Investimento por Formato (R$)</span>
-                        <div class="chart-canvas-wrap">
-                            <canvas id="gChartBarFormato"></canvas>
-                        </div>
-                    </div>
-                </div>
+                </section>
+
             </div>
         </div>
-    </section>
-
-    <!-- Mapa Geográfico -->
-    <section class="map-section" id="mapSection" style="display: none;">
-        <div class="container">
-            <div class="section-header">
-                <h2>🗺️ Distribuição Geográfica</h2>
-            </div>
-            <div id="mapContainer" style="height: 400px; border-radius: 12px; overflow: hidden;"></div>
-        </div>
-    </section>
+    </div>
 
     <!-- Tabela Consolidada -->
     <section class="consolidated-section">

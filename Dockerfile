@@ -17,8 +17,8 @@ COPY . .
 # Create directory for config if it doesn't exist
 RUN mkdir -p config
 
-# Expose the port
-EXPOSE 3000
+# Render injects PORT (default 10000); EXPOSE is documentation for the container
+EXPOSE 10000
 
 # Start the application
 CMD ["npm", "start"]

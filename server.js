@@ -9,7 +9,8 @@ const sqliteService = require('./services/sqlite-service'); // Fallback
 const authService = require('./services/auth-service');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const HOST = process.env.HOST || '0.0.0.0';
+const PORT = Number(process.env.PORT) || 10000;
 // const DB_PATH = path.join(__dirname, 'database/ooh_planner.db'); // Removed
 
 // Initialize Auth Service
@@ -20,6 +21,11 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // For parsing form data
 app.use(express.static('public'));
+
+// Render health check — must respond even if BigQuery/SQLite are unavailable
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok' });
+});
 
 // Session Middleware
 app.use(session({
@@ -48,16 +54,22 @@ console.log('✅ Configurado para usar BigQuery (com fallback SQLite)');
 let dataService = bigQueryService;
 let usingSQLiteFallback = false;
 
-// Try to initialize BigQuery, fallback to SQLite if it fails
+// Try to initialize BigQuery, fallback to SQLite if it fails.
+// Never crash the process here — an unhandled rejection would take the
+// web service down and Render would return HTTP 503.
 (async () => {
     try {
         await bigQueryService.initialize();
         console.log('✅ BigQuery conectado com sucesso');
     } catch (error) {
-        console.warn('⚠️  BigQuery indisponível, usando SQLite local');
+        console.warn('⚠️  BigQuery indisponível, usando SQLite local:', error.message);
         dataService = sqliteService;
         usingSQLiteFallback = true;
-        await sqliteService.initialize();
+        try {
+            await sqliteService.initialize();
+        } catch (sqliteError) {
+            console.error('❌ SQLite fallback também falhou:', sqliteError.message);
+        }
     }
 })();
 
@@ -678,9 +690,9 @@ app.get('/api/bigquery/test', isAuthenticated, async (req, res) => {
 // SERVIDOR
 // ============================================
 
-app.listen(PORT, () => {
-    console.log(`\n🚀 Servidor rodando em http://localhost:${PORT}`);
-    console.log(`📊 API disponível em http://localhost:${PORT}/api`);
+app.listen(PORT, HOST, () => {
+    console.log(`\n🚀 Servidor rodando em http://${HOST}:${PORT}`);
+    console.log(`📊 API disponível em http://${HOST}:${PORT}/api`);
     console.log(`\n💡 Endpoints disponíveis:`);
     console.log(`   GET  /api/filters  - Lista de filtros disponíveis`);
     console.log(`   POST /api/calculate - Calcular totais`);

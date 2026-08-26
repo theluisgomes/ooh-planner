@@ -384,11 +384,70 @@ select.form-control {
     cursor: pointer;
 }
 
+.cycle-disclaimer {
+    margin: var(--spacing-sm) 0 0;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: var(--text-secondary);
+    background: rgba(99, 102, 241, 0.06);
+    border-left: 3px solid var(--primary);
+    border-radius: var(--radius-sm);
+}
+
 /* ============================================
    PLANNING TABLE (Excel-style)
    ============================================ */
 .planning-section {
     margin-bottom: var(--spacing-md);
+}
+
+.format-summary-section {
+    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-md);
+    border: 1px solid var(--excel-border);
+    border-radius: var(--radius-sm);
+    background: #fff;
+}
+
+.format-summary-hint {
+    margin: 0 0 var(--spacing-sm);
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+.format-summary-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.format-summary-group {
+    border: 1px solid var(--excel-border);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.65rem;
+}
+
+.format-summary-rank {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    color: var(--text-primary);
+    margin-bottom: 0.35rem;
+}
+
+.format-summary-list {
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.format-summary-empty {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--text-muted);
 }
 
 .planning-table-wrapper {
@@ -713,12 +772,15 @@ select.form-control {
 
 .gauge-score-label {
     display: block;
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
     color: var(--text-secondary);
     margin-bottom: 4px;
+    max-width: 9.5rem;
+    white-space: normal;
+    line-height: 1.25;
 }
 
 .gauge-score-value {

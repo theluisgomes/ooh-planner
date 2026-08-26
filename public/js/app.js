@@ -48,18 +48,92 @@ function toTitleCase(str) {
     return str.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
 }
 
+// Spec item 2: display labels for ciclos. API values stay lowercase for filtering.
+// Spec item 4 calls "data produto" GG Produto in the disclaimer copy; the De-Para uses GG Datas.
+const CYCLE_LABELS = {
+    'data produto': 'GG Datas',
+    'data promo': 'GG Promo',
+    'ouro produto': 'G Produto',
+    'ouro promo': 'G Promo',
+    'prata': 'M',
+    'ouro produto e promo': 'G Produto e Promo',
+    'data produto e promo': 'GG Produto e Promo'
+};
+
+const CYCLE_DISCLAIMERS = {
+    'data produto': 'Foco em produto, maior apelo em grandes formatos, qualidade no tipo de material, custo por face mais elevado e maior esforço qualitativo.',
+    'ouro produto': 'Foco em produto, maior apelo em grandes formatos, qualidade no tipo de material, custo por face mais elevado e maior esforço qualitativo.',
+    'data promo': 'Foco em alcance, pulverização massiva, maior rentabilidade no custo por face, maior apelo quantitativo.',
+    'ouro promo': 'Foco em alcance, pulverização massiva, maior rentabilidade no custo por face, maior apelo quantitativo.',
+    'prata': 'Ciclo de sustentação, equilíbrio entre rentabilidade e relevância no ambiente da rua.',
+    'data produto e promo': 'Equilíbrio entre rentabilidade e visibilidade, considerando a estrutura local de OOH. Maior relevância e peso na grade de ciclos.',
+    'ouro produto e promo': 'Equilíbrio entre rentabilidade e visibilidade, considerando a estrutura local de OOH.'
+};
+
+function cycleLabel(value) {
+    if (!value) return value;
+    return CYCLE_LABELS[String(value).toLowerCase()] || value;
+}
+
+function cycleDisclaimer(value) {
+    if (!value) return '';
+    return CYCLE_DISCLAIMERS[String(value).toLowerCase()] || '';
+}
+
+function updateCycleDisclaimer(blockElement, taxonomia) {
+    const el = blockElement.querySelector('.cycle-disclaimer');
+    if (!el) return;
+    const text = cycleDisclaimer(taxonomia);
+    if (!text) {
+        el.hidden = true;
+        el.textContent = '';
+        return;
+    }
+    const label = cycleLabel(taxonomia);
+    el.hidden = false;
+    el.textContent = `${label} — ${text}`;
+}
+
+function appendCycleOption(select, val) {
+    const option = document.createElement('option');
+    option.value = val;
+    option.textContent = cycleLabel(val);
+    select.appendChild(option);
+}
+
 function normalizeTotalFaces(row) {
     const min = Number.isFinite(Number(row.range_minimo)) ? Number(row.range_minimo) : 0;
     const current = Number.isFinite(Number(row.totalFaces)) ? Number(row.totalFaces) : 0;
     const rawMax = Number(row.range_maximo);
-    // When range_maximo is 0/null, fall back to raw quantity so rows are not zeroed out
+    // Clamp into min/max when a positive max exists; never push quantity up to max.
     let max = (Number.isFinite(rawMax) && rawMax > 0) ? rawMax : Math.max(current, min);
     if (max < min) max = min;
-    return Math.min(Math.max(current, min), max);
+    if (current < min) return min;
+    if (current > max) return max;
+    return current;
+}
+
+function getBaseWeekTotal(row) {
+    return (Number(row.s1) || 0) + (Number(row.s2) || 0) + (Number(row.s3) || 0) + (Number(row.s4) || 0);
+}
+
+function getRecommendedFaces(row) {
+    const qty = Number(row.baseQuantidade);
+    if (Number.isFinite(qty) && qty > 0) return qty;
+    const weeks = getBaseWeekTotal(row);
+    if (weeks > 0) return weeks;
+    return Number(row.totalFaces) || 0;
+}
+
+function copyAbsoluteWeeksFromBase(row) {
+    row.s1_edit = Number(row.s1) || 0;
+    row.s2_edit = Number(row.s2) || 0;
+    row.s3_edit = Number(row.s3) || 0;
+    row.s4_edit = Number(row.s4) || 0;
 }
 
 function distributeFacesAcrossWeeks(row, facesTotal) {
-    const totalWeight = (row.s1 || 0) + (row.s2 || 0) + (row.s3 || 0) + (row.s4 || 0);
+    const totalWeight = getBaseWeekTotal(row);
 
     if (totalWeight <= 0) {
         // No base week profile: deterministic even split with remainder in S4.
@@ -87,6 +161,26 @@ function distributeFacesAcrossWeeks(row, facesTotal) {
         else if (row.s4_edit > 0) row.s4_edit += diff;
         else row.s1_edit += diff;
     }
+}
+
+function applyWeekDistribution(row, facesTotal) {
+    const weekTotal = getBaseWeekTotal(row);
+    // Copy S1–S4 from the base only when that does not change the requested total.
+    // If quantidade ≠ soma das semanas, scaling keeps TT Faces consistent.
+    if (weekTotal > 0 && facesTotal === weekTotal) {
+        copyAbsoluteWeeksFromBase(row);
+        return;
+    }
+    distributeFacesAcrossWeeks(row, facesTotal);
+}
+
+function applyBaseRecommendation(row) {
+    const weekTotal = getBaseWeekTotal(row);
+    if (weekTotal > 0) {
+        copyAbsoluteWeeksFromBase(row);
+        return;
+    }
+    distributeFacesAcrossWeeks(row, getRecommendedFaces(row));
 }
 
 const state = {
@@ -168,12 +262,8 @@ async function updateTaxonomiaOptions(blockElement, praca) {
 
     if (!praca) {
         // No praça selected — show all ciclos
-        (state.filters.taxonomia || []).forEach(val => {
-            const option = document.createElement('option');
-            option.value = val;
-            option.textContent = val;
-            taxonomiaSelect.appendChild(option);
-        });
+        (state.filters.taxonomia || []).forEach(val => appendCycleOption(taxonomiaSelect, val));
+        updateCycleDisclaimer(blockElement, taxonomiaSelect.value);
         return;
     }
 
@@ -189,12 +279,7 @@ async function updateTaxonomiaOptions(blockElement, praca) {
         const available = await response.json();
         const taxonomias = available.taxonomia || [];
 
-        taxonomias.forEach(val => {
-            const option = document.createElement('option');
-            option.value = val;
-            option.textContent = val;
-            taxonomiaSelect.appendChild(option);
-        });
+        taxonomias.forEach(val => appendCycleOption(taxonomiaSelect, val));
 
         // Preserve previous selection if still valid
         if (currentValue && taxonomias.includes(currentValue)) {
@@ -207,13 +292,10 @@ async function updateTaxonomiaOptions(blockElement, praca) {
     } catch (err) {
         console.error('Erro ao atualizar ciclos:', err);
         // Fallback: show all ciclos
-        (state.filters.taxonomia || []).forEach(val => {
-            const option = document.createElement('option');
-            option.value = val;
-            option.textContent = val;
-            taxonomiaSelect.appendChild(option);
-        });
+        (state.filters.taxonomia || []).forEach(val => appendCycleOption(taxonomiaSelect, val));
     }
+
+    updateCycleDisclaimer(blockElement, taxonomiaSelect.value);
 }
 
 async function fetchPlanningData(blockId) {
@@ -263,7 +345,8 @@ async function fetchPlanningData(blockId) {
                 const maxFaces = (Number.isFinite(rawMax) && rawMax > 0) ? rawMax : rawQty;
                 return {
                     ...row,
-                    totalFaces: normalizeTotalFaces(row),
+                    baseQuantidade: rawQty,
+                    totalFaces: rawQty,
                     maxFaces,
                     negociacao_edit: row.desconto || 0,
                     obs: '',
@@ -273,6 +356,7 @@ async function fetchPlanningData(blockId) {
                     s4_edit: 0,
                     facesUsadas: 0,
                     budgetIdeal: 0,
+                    ttLiquido: 0,
                     custoFace: 0,
                     ttNeg: 0,
                     totalLinha: 0
@@ -332,6 +416,13 @@ function autoAllocateFaces(block) {
         row.s1_edit = 0; row.s2_edit = 0; row.s3_edit = 0; row.s4_edit = 0;
     });
 
+    // Spec 11: empty budget uses base Quantidade (and Spec 12 weeks), not range_maximo.
+    if (!budget || budget <= 0) {
+        rows.forEach(row => applyBaseRecommendation(row));
+        recalculatePlanningRows(block);
+        return;
+    }
+
     // Total cost at MAX capacity (all rows fully allocated)
     const totalMaxCost = rows.reduce((sum, r) => sum + getRowCost(r), 0);
 
@@ -340,10 +431,9 @@ function autoAllocateFaces(block) {
         return;
     }
 
-    // No budget constraint or budget covers full MAX: allocate everything
-    if (!budget || budget <= 0 || budget >= totalMaxCost) {
+    if (budget >= totalMaxCost) {
         rows.forEach(row => {
-            distributeFacesAcrossWeeks(row, getCapacity(row));
+            applyWeekDistribution(row, getCapacity(row));
         });
         recalculatePlanningRows(block);
         return;
@@ -366,7 +456,7 @@ function autoAllocateFaces(block) {
         const numCircuits = Math.round(capacity / fpu);
         const packageCost = row.unitario_bruto_tabela * numCircuits;
         if (packageCost > 0 && packageCost <= remainingBudget && capacity > 0) {
-            distributeFacesAcrossWeeks(row, capacity);
+            applyWeekDistribution(row, capacity);
             remainingBudget -= packageCost;
         }
     }
@@ -383,7 +473,7 @@ function autoAllocateFaces(block) {
             const canAfford = Math.floor(remainingBudget / costPerFace);
             const allocMin = Math.min(canAfford, minFaces);
             if (allocMin > 0) {
-                distributeFacesAcrossWeeks(row, allocMin);
+                applyWeekDistribution(row, allocMin);
                 remainingBudget -= costPerFace * allocMin;
             }
         }
@@ -400,7 +490,7 @@ function autoAllocateFaces(block) {
         const fpu = getFpu(row);
         const costPerFace = row.unitario_bruto_tabela / fpu;
         if (costPerFace <= remainingBudget) {
-            distributeFacesAcrossWeeks(row, 1);
+            applyWeekDistribution(row, 1);
             remainingBudget -= costPerFace;
         }
     }
@@ -424,7 +514,7 @@ function autoAllocateFaces(block) {
                     canAdd
                 );
                 if (extra > 0) {
-                    distributeFacesAcrossWeeks(row, currentFaces + extra);
+                    applyWeekDistribution(row, currentFaces + extra);
                     remainingBudget -= costPerFace * extra;
                 }
             });
@@ -448,7 +538,7 @@ function autoAllocateFaces(block) {
                 canAdd
             );
             if (extra > 0) {
-                distributeFacesAcrossWeeks(row, currentFaces + extra);
+                applyWeekDistribution(row, currentFaces + extra);
                 remainingBudget -= costPerFace * extra;
             }
         }
@@ -488,8 +578,9 @@ function recalculatePlanningRows(block) {
         // Recalc index based on faces being used
         row.index = Math.round(row.facesUsadas * (row.pesos || 0.5) * 100) / 100;
 
-        // Fix #3: RECOMENDADO = total_bruto_negociado da base (valor fixo da base)
-        row.budgetIdeal = row.total_bruto_negociado || 0;
+        // Spec 1: TT Líquido is always 80% of TT Negociado
+        row.ttLiquido = Math.round((row.ttNeg || 0) * 0.8 * 100) / 100;
+        row.budgetIdeal = row.ttLiquido;
     });
 }
 
@@ -515,6 +606,7 @@ function renderMediaBlocks() {
         if (blockState.budget) block.querySelector('.input-budget').value = blockState.budget;
         if (blockState.taxonomia) block.querySelector('.input-taxonomia').value = blockState.taxonomia;
         if (blockState.praca) block.querySelector('.input-praca').value = blockState.praca;
+        updateCycleDisclaimer(block, blockState.taxonomia);
 
         setupBlockListeners(block, blockState.id);
 
@@ -535,7 +627,7 @@ function populateCoreSelects(blockElement) {
             const option = document.createElement('option');
             option.value = val;
             // Fix #8: apply title case to display label for praças
-            option.textContent = applyTitleCase ? toTitleCase(val) : val;
+            option.textContent = applyTitleCase ? toTitleCase(val) : cycleLabel(val);
             sel.appendChild(option);
         });
     };
@@ -569,7 +661,9 @@ function setupBlockListeners(blockElement, blockId) {
 
     const taxonomiaSelect = blockElement.querySelector('.input-taxonomia');
     taxonomiaSelect.addEventListener('change', (e) => {
-        getBlockById(blockId).taxonomia = e.target.value || null;
+        const value = e.target.value || null;
+        getBlockById(blockId).taxonomia = value;
+        updateCycleDisclaimer(blockElement, value);
     });
 
     const pracaSelect = blockElement.querySelector('.input-praca');
@@ -583,6 +677,7 @@ function setupBlockListeners(blockElement, blockId) {
         // If taxonomia was reset (no longer valid for new praça), update block state
         const taxonomiaSelect = blockElement.querySelector('.input-taxonomia');
         block.taxonomia = taxonomiaSelect.value || null;
+        updateCycleDisclaimer(blockElement, block.taxonomia);
     });
 
     const generateBtn = blockElement.querySelector('.btn-generate');
@@ -647,10 +742,12 @@ function updateBlockUI(blockId) {
 
     const statusBadge = blockElement.querySelector('.status-badge');
     const planningSection = blockElement.querySelector('.planning-section');
+    const formatSummarySection = blockElement.querySelector('.format-summary-section');
     const gaugesSection = blockElement.querySelector('.gauges-section');
     const messageDiv = blockElement.querySelector('.block-message');
 
     planningSection.style.display = 'none';
+    if (formatSummarySection) formatSummarySection.style.display = 'none';
     gaugesSection.style.display = 'none';
     messageDiv.style.display = 'none';
 
@@ -667,6 +764,7 @@ function updateBlockUI(blockId) {
     statusBadge.classList.add('active');
 
     planningSection.style.display = 'block';
+    if (formatSummarySection) formatSummarySection.style.display = 'block';
     gaugesSection.style.display = 'block';
 
     renderPlanningTableBody(blockId);
@@ -684,10 +782,14 @@ function renderPlanningTableBody(blockId) {
     const tbody = blockElement.querySelector('.planning-body');
     tbody.innerHTML = '';
 
-    block.planningRows.forEach((row, index) => {
+    const sortedRows = block.planningRows
+        .map((row, originalIndex) => ({ row, originalIndex }))
+        .sort((a, b) => (Number(b.row.index) || 0) - (Number(a.row.index) || 0));
+
+    sortedRows.forEach(({ row, originalIndex }, visualIndex) => {
         // Fix #1: Show ALL rows (even those with no allocation this cycle)
         const tr = document.createElement('tr');
-        tr.className = index < 3 ? `priority-rank-${index + 1}` : '';
+        tr.className = visualIndex < 3 ? `priority-rank-${visualIndex + 1}` : '';
 
         const negPct = row.negociacao_edit ? (row.negociacao_edit * 100).toFixed(0) : '0';
         const tipoCompra = row.circuito ? 'CIRCUITO' : 'UNITÁRIO';
@@ -707,7 +809,7 @@ function renderPlanningTableBody(blockId) {
             <td class="cell-number range-min">${rangeMin}</td>
             <td class="cell-number range-max">${rangeMax}</td>
             <td class="cell-week">
-                <input type="number" class="inline-input input-total-faces" value="${row.totalFaces}" min="${rangeMin}" max="${rangeMax}" data-row="${index}" title="Mín: ${rangeMin} | Máx: ${rangeMax}">
+                <input type="number" class="inline-input input-total-faces" value="${row.totalFaces}" min="${rangeMin}" max="${rangeMax}" data-row="${originalIndex}" title="Mín: ${rangeMin} | Máx: ${rangeMax}">
             </td>
             <td class="cell-number">${row.index}</td>
             <td class="cell-material">
@@ -716,30 +818,30 @@ function renderPlanningTableBody(blockId) {
                     : '<span class="material-badge material-badge-estatico">🪟 EST</span>'}
             </td>
             <td class="cell-week">
-                <input type="number" class="inline-input input-s1" value="${row.s1_edit}" min="0" max="${rangeMax}" data-row="${index}" data-field="s1_edit">
+                <input type="number" class="inline-input input-s1" value="${row.s1_edit}" min="0" max="${rangeMax}" data-row="${originalIndex}" data-field="s1_edit">
             </td>
             <td class="cell-week">
-                <input type="number" class="inline-input input-s2" value="${row.s2_edit}" min="0" max="${rangeMax}" data-row="${index}" data-field="s2_edit">
+                <input type="number" class="inline-input input-s2" value="${row.s2_edit}" min="0" max="${rangeMax}" data-row="${originalIndex}" data-field="s2_edit">
             </td>
             <td class="cell-week">
-                <input type="number" class="inline-input input-s3" value="${row.s3_edit}" min="0" max="${rangeMax}" data-row="${index}" data-field="s3_edit">
+                <input type="number" class="inline-input input-s3" value="${row.s3_edit}" min="0" max="${rangeMax}" data-row="${originalIndex}" data-field="s3_edit">
             </td>
             <td class="cell-week">
-                <input type="number" class="inline-input input-s4" value="${row.s4_edit}" min="0" max="${rangeMax}" data-row="${index}" data-field="s4_edit">
+                <input type="number" class="inline-input input-s4" value="${row.s4_edit}" min="0" max="${rangeMax}" data-row="${originalIndex}" data-field="s4_edit">
             </td>
             <td class="cell-currency cell-tabela-unit">
-                <input type="number" class="inline-input input-tabela-unit" value="${row.unitario_bruto_tabela}" min="0" step="0.01" data-row="${index}" title="Tabela Unitário (editável)">
+                <input type="text" class="inline-input input-tabela-unit" inputmode="decimal" value="${formatNumber(row.unitario_bruto_tabela)}" data-row="${originalIndex}" title="Tabela Unitário (editável)">
             </td>
             <td class="cell-currency cell-total-linha">${formatNumber(row.totalLinha)}</td>
             <td class="cell-neg">
-                <input type="number" class="inline-input input-neg" value="${negPct}" min="0" max="100" data-row="${index}">
+                <input type="number" class="inline-input input-neg" value="${negPct}" min="0" max="100" data-row="${originalIndex}">
                 <span class="neg-pct">%</span>
             </td>
             <td class="cell-currency">${formatNumber(row.ttNeg)}</td>
-            <td class="cell-currency cell-budget-ideal">${formatNumber((row.ttNeg || 0) * 0.8)}</td>
+            <td class="cell-currency cell-budget-ideal">${formatNumber(row.ttLiquido)}</td>
             <td class="cell-currency">${formatNumber(row.custoFace)}</td>
             <td class="cell-obs">
-                <input type="text" class="inline-input input-obs" value="${row.obs || ''}" placeholder="..." data-row="${index}">
+                <input type="text" class="inline-input input-obs" value="${row.obs || ''}" placeholder="..." data-row="${originalIndex}">
             </td>
         `;
 
@@ -765,7 +867,7 @@ function renderPlanningTableBody(blockId) {
             e.target.value = row.totalFaces;
             validateFaceRange(e.target);
             // Predictable manual edit: only this line is redistributed by week profile.
-            distributeFacesAcrossWeeks(row, row.totalFaces);
+            applyWeekDistribution(row, row.totalFaces);
             recalculatePlanningRows(block);
             renderPlanningTableBody(blockId);
             updateGauges(blockId);
@@ -830,15 +932,25 @@ function renderPlanningTableBody(blockId) {
             updateConsolidated();
         });
 
-        // Tabela Unitária editável
-        tr.querySelector('.input-tabela-unit').addEventListener('change', (e) => {
+        // Tabela Unitária editável, formatada como investimento (1.000)
+        const tabelaInput = tr.querySelector('.input-tabela-unit');
+        tabelaInput.addEventListener('focus', (e) => {
             const rowIdx = parseInt(e.target.dataset.row);
-            const val = parseFloat(e.target.value) || 0;
+            e.target.value = String(block.planningRows[rowIdx].unitario_bruto_tabela ?? 0);
+            e.target.select();
+        });
+        tabelaInput.addEventListener('blur', (e) => {
+            const rowIdx = parseInt(e.target.dataset.row);
+            const val = parseLocaleNumber(e.target.value);
             block.planningRows[rowIdx].unitario_bruto_tabela = val;
+            e.target.value = formatNumber(val);
             recalculatePlanningRows(block);
             renderPlanningTableBody(blockId);
             updateGauges(blockId);
             updateConsolidated();
+        });
+        tabelaInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') e.target.blur();
         });
 
         tr.querySelector('.input-obs').addEventListener('change', (e) => {
@@ -851,6 +963,7 @@ function renderPlanningTableBody(blockId) {
 
     // Update totals footer
     updatePlanningTotals(blockId);
+    renderFormatSummary(blockId);
 }
 
 function updatePlanningTotals(blockId) {
@@ -872,7 +985,7 @@ function updatePlanningTotals(blockId) {
         tabela: rows.reduce((s, r) => s + r.unitario_bruto_tabela, 0),
         totalLinha: rows.reduce((s, r) => s + (r.totalLinha || 0), 0),
         neg: rows.reduce((s, r) => s + r.ttNeg, 0),
-        budgetIdeal: rows.reduce((s, r) => s + r.budgetIdeal, 0),
+        ttLiquido: rows.reduce((s, r) => s + (r.ttLiquido || 0), 0),
         custoFace: rows.reduce((s, r) => s + r.custoFace, 0)
     };
 
@@ -887,8 +1000,45 @@ function updatePlanningTotals(blockId) {
     blockElement.querySelector('.total-tabela').textContent = formatNumber(totals.tabela);
     blockElement.querySelector('.total-linha').textContent = formatNumber(totals.totalLinha);
     blockElement.querySelector('.total-neg').textContent = formatNumber(totals.neg);
-    blockElement.querySelector('.total-budget-ideal').textContent = formatNumber(totals.budgetIdeal);
+    blockElement.querySelector('.total-budget-ideal').textContent = formatNumber(totals.ttLiquido);
     blockElement.querySelector('.total-custo-face').textContent = formatNumber(totals.custoFace);
+}
+
+function renderFormatSummary(blockId) {
+    const block = getBlockById(blockId);
+    const blockElement = document.querySelector(`[data-block-id="${blockId}"]`);
+    if (!blockElement || !block.planningRows) return;
+
+    const body = blockElement.querySelector('.format-summary-body');
+    if (!body) return;
+
+    const recommended = block.planningRows.filter(r => (r.facesUsadas || 0) > 0);
+    if (recommended.length === 0) {
+        body.innerHTML = '<p class="format-summary-empty">Nenhum veículo alocado neste plano.</p>';
+        return;
+    }
+
+    const groups = new Map();
+    recommended.forEach(row => {
+        const rankRaw = Number(row.ranking);
+        const rank = Number.isFinite(rankRaw) && rankRaw > 0 ? rankRaw : 99;
+        if (!groups.has(rank)) groups.set(rank, []);
+        groups.get(rank).push(row);
+    });
+
+    const orderedRanks = Array.from(groups.keys()).sort((a, b) => a - b);
+    body.innerHTML = orderedRanks.map(rank => {
+        const items = groups.get(rank)
+            .slice()
+            .sort((a, b) => (Number(b.index) || 0) - (Number(a.index) || 0))
+            .map(row => `<li><strong>${escapeHtml(row.exibidores || '--')}</strong> — ${escapeHtml(row.formato || '--')}</li>`)
+            .join('');
+        const rankLabel = rank === 99 ? 'Sem ranking na base' : `Ranking ${rank}`;
+        return `<div class="format-summary-group">
+            <div class="format-summary-rank">${rankLabel}</div>
+            <ul class="format-summary-list">${items}</ul>
+        </div>`;
+    }).join('');
 }
 
 // ============================================
@@ -906,21 +1056,18 @@ function updateGauges(blockId) {
 function updateExposureGauge(block, blockElement) {
     const rows = block.planningRows;
 
-    // Fix #5: Use range_minimo and range_maximo from the base for min/max display
-    let totalMin = 0, totalMax = 0, totalMedian = 0;
+    // Spec 5: min/max are total recommended faces from the base (no Median)
+    let totalMin = 0, totalMax = 0;
 
     rows.forEach(row => {
         const rowMin = Number(row.range_minimo) || 0;
         const rowMax = Number(row.range_maximo) > 0 ? Number(row.range_maximo) : (Number(row.maxFaces) || 0);
         totalMin += rowMin;
         totalMax += rowMax;
-        // Median: midpoint between range_minimo and range_maximo
-        totalMedian += Math.round((rowMin + rowMax) / 2);
     });
 
     blockElement.querySelector('.exp-total-min').textContent = totalMin;
     blockElement.querySelector('.exp-total-max').textContent = totalMax;
-    blockElement.querySelector('.exp-total-median').textContent = totalMedian;
 
     // Exposure gauge: allocated faces vs. total maximum capacity in the current cycle.
     const totalAllocated = rows.reduce((s, r) => s + (r.s1_edit || 0) + (r.s2_edit || 0) + (r.s3_edit || 0) + (r.s4_edit || 0), 0);
@@ -1080,8 +1227,8 @@ function updateConsolidated() {
 
     const totalBudget = activeBlocks.reduce((sum, b) => {
         const hasBudget = b.budget && b.budget > 0;
-        const recomendado = (b.planningRows || []).reduce((s, r) => s + (r.budgetIdeal || 0), 0);
-        return sum + (hasBudget ? b.budget : recomendado);
+        const liquido = (b.planningRows || []).reduce((s, r) => s + (r.ttLiquido || 0), 0);
+        return sum + (hasBudget ? b.budget : liquido);
     }, 0);
     document.getElementById('totalCard').textContent = formatCurrency(totalBudget);
 
@@ -1094,18 +1241,20 @@ function updateConsolidated() {
         activeBlocks.forEach(block => {
             const totalFaces = block.planningRows.reduce((s, r) => s + r.totalFaces, 0);
             const totalNeg = block.planningRows.reduce((s, r) => s + (r.ttNeg || 0), 0);
-            const totalRecomendado = block.planningRows.reduce((s, r) => s + (r.ttNeg || 0), 0) * 0.8;
-            const statusText = totalNeg <= block.budget ? '✅ OK' : '⚠️ Acima';
+            const totalLiquido = block.planningRows.reduce((s, r) => s + (r.ttLiquido || 0), 0);
+            const statusText = !block.budget || block.budget <= 0
+                ? '✅ OK'
+                : (totalNeg <= block.budget ? '✅ OK' : '⚠️ Acima');
 
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>Plano ${block.id}</td>
                 <td>${block.praca || '--'}</td>
-                <td>${block.taxonomia || '--'}</td>
-                <td>${formatCurrency(block.budget)}</td>
+                <td>${cycleLabel(block.taxonomia) || '--'}</td>
+                <td>${block.budget ? formatCurrency(block.budget) : '—'}</td>
                 <td>${block.planningRows.length} formatos</td>
                 <td>${totalFaces}</td>
-                <td>${formatCurrency(totalRecomendado)}</td>
+                <td>${formatCurrency(totalLiquido)}</td>
                 <td>${statusText}</td>
             `;
             tbody.appendChild(row);
@@ -1456,7 +1605,7 @@ function exportCSV() {
         return;
     }
 
-    const headers = ['Plano', 'Veículo', 'Peso', 'Formato', 'Circuito', 'Periodicidade', 'Min', 'Max', 'TT Faces', 'Index', 'Tipo Material', 'S1', 'S2', 'S3', 'S4', 'Tabela Unit.', 'Negociação %', 'TT Neg.', 'Valor Líquido', 'Custo/Face', 'OBS'];
+    const headers = ['Plano', 'Veículo', 'Peso', 'Formato', 'Circuito', 'Periodicidade', 'Min', 'Max', 'TT Faces', 'Index', 'Tipo Material', 'S1', 'S2', 'S3', 'S4', 'Tabela Unit.', 'Negociação %', 'TT Neg.', 'TT Líquido', 'Custo/Face', 'OBS'];
 
     const rows = [];
     activeBlocks.forEach(block => {
@@ -1480,7 +1629,7 @@ function exportCSV() {
                 row.unitario_bruto_tabela,
                 ((row.negociacao_edit || 0) * 100).toFixed(0) + '%',
                 row.ttNeg,
-                (row.ttNeg || 0) * 0.8,
+                row.ttLiquido,
                 row.custoFace,
                 row.obs || ''
             ]);
@@ -1519,6 +1668,9 @@ async function loadPlan(planId) {
                     if (block.planningRows && block.planningRows.length > 0) {
                         // Saved plan already has planningRows – just mark as active and render
                         block.planningRows.forEach(row => {
+                            if (row.baseQuantidade == null) {
+                                row.baseQuantidade = Number(row.totalFaces) || getBaseWeekTotal(row) || 0;
+                            }
                             row.totalFaces = normalizeTotalFaces(row);
                         });
                         recalculatePlanningRows(block);
@@ -1559,12 +1711,34 @@ function formatCurrency(value) {
     });
 }
 
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
 function formatNumber(value) {
     if (value === null || value === undefined || isNaN(value)) return '0';
     return Number(value).toLocaleString('pt-BR', {
         minimumFractionDigits: 0,
         maximumFractionDigits: 0
     });
+}
+
+function parseLocaleNumber(value) {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+    if (value === null || value === undefined) return 0;
+    const s = String(value).trim();
+    if (!s) return 0;
+    if (s.includes(',')) {
+        return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0;
+    }
+    if (/^\d{1,3}(\.\d{3})+$/.test(s)) {
+        return parseFloat(s.replace(/\./g, '')) || 0;
+    }
+    return parseFloat(s) || 0;
 }
 
 function formatExposure(value) {

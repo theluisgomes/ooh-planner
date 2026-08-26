@@ -170,7 +170,7 @@
                             <th>Budget</th>
                             <th>Formatos</th>
                             <th>TT Faces</th>
-                            <th>Valor Líquido</th>
+                            <th>TT Líquido</th>
                             <th>Status</th>
                         </tr>
                     </thead>
@@ -243,6 +243,7 @@
                             </button>
                         </div>
                     </div>
+                    <p class="cycle-disclaimer" hidden></p>
                 </div>
 
                 <!-- PLANNING TABLE -->
@@ -252,38 +253,21 @@
                         <table class="planning-table">
                             <thead>
                                 <tr class="planning-header-main">
-                                    <th rowspan="2">VEÍCULO</th>
-                                    <th rowspan="2" data-tooltip="Formato da mídia com distinção de tipo de compra (Circuito ou Unitário)">FORMATO / TIPO</th>
-                                    <th rowspan="2"
-                                        data-tooltip="Periodicidade da campanha para este formato">PERIOD.</th>
-                                    <th rowspan="2"
-                                        data-tooltip="Range mínimo de faces recomendado para este formato na praça">MIN</th>
-                                    <th rowspan="2"
-                                        data-tooltip="Range máximo de faces recomendado para este formato na praça">MAX</th>
-                                    <th rowspan="2"
-                                        data-tooltip="Total de faces contratadas (editável; respeite o range MIN/MAX)">TT
-                                        FACES</th>
-                                    <th rowspan="2"
-                                        data-tooltip="Score ponderado do veículo baseado nos pesos estratégicos da campanha">
-                                        INDEX</th>
-                                    <th rowspan="2">TIPO MATERIAL</th>
-                                    <th colspan="4" class="weeks-header">SEMANAS</th>
-                                    <th rowspan="2" data-tooltip="Preço de tabela por face (valor bruto sem desconto)">
-                                        TABELA UNIT.</th>
-                                    <th rowspan="2"
-                                        data-tooltip="Tabela unitária × faces usadas (custo bruto da linha)">TOTAL LINHA
-                                    </th>
-                                    <th rowspan="2" data-tooltip="% de desconto negociado sobre o preço de tabela">
-                                        NEGOCIAÇÃO</th>
-                                    <th rowspan="2"
-                                        data-tooltip="Custo total negociado da linha (após desconto × faces usadas)">TT
-                                        NEGOCIADO</th>
-                                    <th rowspan="2"
-                                        data-tooltip="Valor líquido = TT Negociado × 0,8 (80% do custo negociado)">
-                                        VALOR LÍQUIDO</th>
-                                    <th rowspan="2"
-                                        data-tooltip="Preço negociado por face individual (tabela × (1 − desconto))">
-                                        CUSTO/FACE</th>
+                                    <th rowspan="2" data-tooltip="Exibidor local">VEÍCULO</th>
+                                    <th rowspan="2" data-tooltip="Tipo do ativo de OOH">FORMATO / TIPO</th>
+                                    <th rowspan="2" data-tooltip="Periodicidade do formato">PERIOD.</th>
+                                    <th rowspan="2" data-tooltip="Quantidade mínima de faces recomendada para esse ciclo">MIN</th>
+                                    <th rowspan="2" data-tooltip="Quantidade máxima de faces recomendada para esse ciclo">MAX</th>
+                                    <th rowspan="2" data-tooltip="Quantidade total de faces">TT FACES</th>
+                                    <th rowspan="2" data-tooltip="Peso do formato e canal na estratégia do ciclo (Quanto maior, mais relevante)">INDEX</th>
+                                    <th rowspan="2" data-tooltip="Tipo do material utilizado na face (Digital ou estático)">TIPO MATERIAL</th>
+                                    <th colspan="4" class="weeks-header" data-tooltip="Distribuição por semana de ciclo">SEMANAS</th>
+                                    <th rowspan="2" data-tooltip="Valor tabela unitário">TABELA UNIT.</th>
+                                    <th rowspan="2" data-tooltip="Valor total da quantidade de faces selecionada">TT TABELA</th>
+                                    <th rowspan="2" data-tooltip="Desconto negociado com o Exibidor">NEGOCIAÇÃO</th>
+                                    <th rowspan="2" data-tooltip="Valor total com aplicação da negociação">TT NEGOCIADO</th>
+                                    <th rowspan="2" data-tooltip="Valor desembolsado pelo cliente, valor final">TT LÍQUIDO</th>
+                                    <th rowspan="2" data-tooltip="Custo unitário da face com negociação">CUSTO/FACE</th>
                                     <th rowspan="2">OBS</th>
                                 </tr>
                                 <tr class="planning-header-weeks">
@@ -322,6 +306,13 @@
                     </div>
                 </div>
 
+                <!-- RESUMO DE FORMATO (Ranking → veículos) -->
+                <div class="format-summary-section" style="display: none;">
+                    <h4 class="section-title">Resumo de formato</h4>
+                    <p class="format-summary-hint">Priorização pela coluna Ranking da base. Recomendação: veículos com faces alocadas.</p>
+                    <div class="format-summary-body"></div>
+                </div>
+
                 <!-- EXPOSIÇÃO + EFICIÊNCIA GAUGES -->
                 <div class="gauges-section" style="display: none;">
                     <div class="gauges-grid">
@@ -332,18 +323,14 @@
                                 EXPOSIÇÃO</h4>
                             <div class="gauge-scores">
                                 <div class="gauge-score"
-                                    data-tooltip="Menor número de faces alocadas entre as semanas S1–S4">
-                                    <span class="gauge-score-label">Min</span>
+                                    data-tooltip="Quantidade mínima de faces totais recomendada para o ciclo">
+                                    <span class="gauge-score-label">Quantidade mínima de faces totais</span>
                                     <span class="gauge-score-value exp-total-min">--</span>
                                 </div>
                                 <div class="gauge-score"
-                                    data-tooltip="Maior número de faces alocadas entre as semanas S1–S4">
-                                    <span class="gauge-score-label">Max</span>
+                                    data-tooltip="Quantidade máxima de faces totais recomendada para o ciclo">
+                                    <span class="gauge-score-label">Quantidade máxima de faces totais</span>
                                     <span class="gauge-score-value exp-total-max">--</span>
-                                </div>
-                                <div class="gauge-score" data-tooltip="Média de faces alocadas entre todas as semanas">
-                                    <span class="gauge-score-label">Median</span>
-                                    <span class="gauge-score-value exp-total-median">--</span>
                                 </div>
                             </div>
                             <div class="gauge-slider-container">

@@ -64,7 +64,7 @@
             </div>
 
             <div class="actions-bar" style="text-align: center; margin: 2rem 0;">
-                <button id="btnAddBlock" class="btn btn-primary" onclick="addBlock()">
+                <button type="button" id="btnAddBlock" class="btn btn-primary">
                     + ADICIONAR PLANO DE MÍDIA
                 </button>
             </div>
@@ -256,8 +256,8 @@
                                     <th rowspan="2" data-tooltip="Exibidor local">VEÍCULO</th>
                                     <th rowspan="2" data-tooltip="Tipo do ativo de OOH">FORMATO / TIPO</th>
                                     <th rowspan="2" data-tooltip="Periodicidade do formato">PERIOD.</th>
-                                    <th rowspan="2" data-tooltip="Quantidade mínima de faces recomendada para esse ciclo">MIN</th>
-                                    <th rowspan="2" data-tooltip="Quantidade máxima de faces recomendada para esse ciclo">MAX</th>
+                                    <th rowspan="2" data-tooltip="Quantidade mínima de faces recomendada para o formato neste ciclo">MIN FORMATO</th>
+                                    <th rowspan="2" data-tooltip="Quantidade máxima de faces recomendada para o formato neste ciclo">MAX FORMATO</th>
                                     <th rowspan="2" data-tooltip="Quantidade total de faces">TT FACES</th>
                                     <th rowspan="2" data-tooltip="Peso do formato e canal na estratégia do ciclo (Quanto maior, mais relevante)">INDEX</th>
                                     <th rowspan="2" data-tooltip="Tipo do material utilizado na face (Digital ou estático)">TIPO MATERIAL</th>
@@ -319,7 +319,7 @@
                         <!-- EXPOSIÇÃO -->
                         <div class="gauge-card">
                             <h4 class="gauge-title"
-                                data-tooltip="Compara a cobertura de faces alocada (Seu Plano) vs. o total disponível.">
+                                data-tooltip="Volume de faces entre o mínimo e máximo necessário para a visibilidade e efetividade do plano">
                                 EXPOSIÇÃO</h4>
                             <div class="gauge-scores">
                                 <div class="gauge-score"
@@ -350,7 +350,7 @@
                         <!-- EFICIÊNCIA R$ -->
                         <div class="gauge-card">
                             <h4 class="gauge-title"
-                                data-tooltip="Mede a eficiência da sua negociação. Quanto maior o desconto obtido sobre a tabela, mais eficiente é o plano.">
+                                data-tooltip="Eficiência corresponde a efetividade do custo por face e rentabilidade do plano">
                                 EFICIÊNCIA R$</h4>
                             <div class="gauge-scores">
                                 <div class="gauge-score"

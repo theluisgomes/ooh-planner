@@ -25,10 +25,17 @@ function getBlockById(id) {
 }
 
 function addBlock() {
+    const MAX_BLOCKS = 16;
+    if (state.mediaBlocks.length >= MAX_BLOCKS) {
+        alert(`O limite é de ${MAX_BLOCKS} planos de mídia.`);
+        return;
+    }
     const newId = state.nextBlockId++;
     const newBlock = createBlockState(newId);
     state.mediaBlocks.push(newBlock);
-    renderMediaBlocks();
+    mountMediaBlock(newBlock, state.mediaBlocks.length - 1);
+    const el = document.querySelector(`[data-block-id="${newId}"]`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function removeBlock(blockId) {
@@ -366,16 +373,18 @@ async function fetchPlanningData(blockId) {
             // Auto-optimize face allocation based on budget
             autoAllocateFaces(block);
         }
-
-        updateBlockUI(blockId);
-        updateConsolidated();
-
     } catch (err) {
         console.error(`Erro ao buscar planning data do bloco ${blockId}:`, err);
         block.planningData = null;
         block.active = false;
         showBlockMessage(blockId, 'Erro de conexão ao buscar dados', 'error');
+    }
+
+    try {
         updateBlockUI(blockId);
+        updateConsolidated();
+    } catch (uiErr) {
+        console.error(`Erro ao atualizar UI do bloco ${blockId}:`, uiErr);
     }
 }
 
@@ -589,34 +598,35 @@ function recalculatePlanningRows(block) {
 // ============================================
 function renderMediaBlocks() {
     const container = document.getElementById('mediaBlocks');
-    const template = document.getElementById('mediaBlockTemplate');
     container.innerHTML = '';
 
     state.mediaBlocks.forEach((blockState, index) => {
-        const clone = template.content.cloneNode(true);
-        const block = clone.querySelector('.media-block');
-        block.dataset.blockId = blockState.id;
-
-        clone.querySelector('.number-badge').textContent = index + 1;
-        clone.querySelector('.config-label').textContent = `PLANO DE MÍDIA #${String(index + 1).padStart(2, '0')}`;
-
-        populateCoreSelects(block);
-
-        // Restore values
-        if (blockState.budget) block.querySelector('.input-budget').value = blockState.budget;
-        if (blockState.taxonomia) block.querySelector('.input-taxonomia').value = blockState.taxonomia;
-        if (blockState.praca) block.querySelector('.input-praca').value = blockState.praca;
-        updateCycleDisclaimer(block, blockState.taxonomia);
-
-        setupBlockListeners(block, blockState.id);
-
-        container.appendChild(clone);
-
-        // After appending, update UI if block has data
+        mountMediaBlock(blockState, index);
         if (blockState.planningData) {
             setTimeout(() => updateBlockUI(blockState.id), 0);
         }
     });
+}
+
+function mountMediaBlock(blockState, index) {
+    const container = document.getElementById('mediaBlocks');
+    const template = document.getElementById('mediaBlockTemplate');
+    const clone = template.content.cloneNode(true);
+    const block = clone.querySelector('.media-block');
+    block.dataset.blockId = blockState.id;
+
+    clone.querySelector('.number-badge').textContent = index + 1;
+    clone.querySelector('.config-label').textContent = `PLANO DE MÍDIA #${String(index + 1).padStart(2, '0')}`;
+
+    populateCoreSelects(block);
+
+    if (blockState.budget) block.querySelector('.input-budget').value = blockState.budget;
+    if (blockState.taxonomia) block.querySelector('.input-taxonomia').value = blockState.taxonomia;
+    if (blockState.praca) block.querySelector('.input-praca').value = blockState.praca;
+    updateCycleDisclaimer(block, blockState.taxonomia);
+
+    setupBlockListeners(block, blockState.id);
+    container.appendChild(clone);
 }
 
 function populateCoreSelects(blockElement) {
@@ -681,21 +691,24 @@ function setupBlockListeners(blockElement, blockId) {
     });
 
     const generateBtn = blockElement.querySelector('.btn-generate');
-    generateBtn.addEventListener('click', () => {
+    generateBtn.addEventListener('click', async () => {
         const blk = getBlockById(blockId);
-        // Sync current select values into block state before generating
         blk.praca = blockElement.querySelector('.input-praca').value || null;
         blk.taxonomia = blockElement.querySelector('.input-taxonomia').value || null;
+        const budgetVal = parseFloat(blockElement.querySelector('.input-budget').value);
+        blk.budget = isNaN(budgetVal) ? null : budgetVal;
         if (!blk.praca || !blk.taxonomia) {
             alert('Por favor, seleccione a Praça e o Ciclo antes de gerar o plano.');
             return;
         }
         generateBtn.disabled = true;
         generateBtn.textContent = '⏳ A gerar…';
-        fetchPlanningData(blockId).finally(() => {
+        try {
+            await fetchPlanningData(blockId);
+        } finally {
             generateBtn.disabled = false;
             generateBtn.textContent = '▶ Gerar Plano';
-        });
+        }
     });
 
     const deleteBtn = blockElement.querySelector('.btn-delete');
@@ -713,6 +726,11 @@ function setupBlockListeners(blockElement, blockId) {
 function setupEventListeners() {
     document.getElementById('btnResetAll').addEventListener('click', resetAll);
     document.getElementById('btnExport').addEventListener('click', exportCSV);
+
+    const btnAddBlock = document.getElementById('btnAddBlock');
+    if (btnAddBlock) {
+        btnAddBlock.addEventListener('click', addBlock);
+    }
 
     const btnSavePlan = document.getElementById('btnSavePlan');
     if (btnSavePlan) {
@@ -748,7 +766,7 @@ function updateBlockUI(blockId) {
 
     planningSection.style.display = 'none';
     if (formatSummarySection) formatSummarySection.style.display = 'none';
-    gaugesSection.style.display = 'none';
+    if (gaugesSection) gaugesSection.style.display = 'none';
     messageDiv.style.display = 'none';
 
     if (!block.planningData || !block.active) {
@@ -765,13 +783,13 @@ function updateBlockUI(blockId) {
 
     planningSection.style.display = 'block';
     if (formatSummarySection) formatSummarySection.style.display = 'block';
-    gaugesSection.style.display = 'block';
+    if (gaugesSection) gaugesSection.style.display = 'block';
 
     renderPlanningTableBody(blockId);
     updateGauges(blockId);
-    updateBlockHints(blockId); // Update AI hints
-    renderGlobalDashboard();
-    renderMap();
+    updateBlockHints(blockId);
+    try { renderGlobalDashboard(); } catch (err) { console.error('Dashboard:', err); }
+    try { renderMap(); } catch (err) { console.error('Mapa:', err); }
 }
 
 function renderPlanningTableBody(blockId) {
@@ -1044,6 +1062,29 @@ function renderFormatSummary(blockId) {
 // ============================================
 // GAUGE UPDATES
 // ============================================
+function clampGaugePercent(value) {
+    return Math.min(Math.max(value, 2), 98);
+}
+
+// Map a value onto the pendulum so min sits at UNDER, midpoint at the 50%
+// baseline (resultado médio), and max at OVER.
+function scaleToRangePercent(value, min, max) {
+    if (!Number.isFinite(value)) return 50;
+    if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) {
+        if (value < min) return 2;
+        if (value > max) return 98;
+        return 50;
+    }
+    return clampGaugePercent(((value - min) / (max - min)) * 100);
+}
+
+function pendulumColorFromCenter(percent) {
+    const dist = Math.abs(percent - 50);
+    if (dist <= 15) return '#10B981';
+    if (dist <= 35) return '#F59E0B';
+    return '#EF4444';
+}
+
 function updateGauges(blockId) {
     const block = getBlockById(blockId);
     const blockElement = document.querySelector(`[data-block-id="${blockId}"]`);
@@ -1056,9 +1097,7 @@ function updateGauges(blockId) {
 function updateExposureGauge(block, blockElement) {
     const rows = block.planningRows;
 
-    // Spec 5: min/max are total recommended faces from the base (no Median)
     let totalMin = 0, totalMax = 0;
-
     rows.forEach(row => {
         const rowMin = Number(row.range_minimo) || 0;
         const rowMax = Number(row.range_maximo) > 0 ? Number(row.range_maximo) : (Number(row.maxFaces) || 0);
@@ -1069,104 +1108,65 @@ function updateExposureGauge(block, blockElement) {
     blockElement.querySelector('.exp-total-min').textContent = totalMin;
     blockElement.querySelector('.exp-total-max').textContent = totalMax;
 
-    // Exposure gauge: allocated faces vs. total maximum capacity in the current cycle.
     const totalAllocated = rows.reduce((s, r) => s + (r.s1_edit || 0) + (r.s2_edit || 0) + (r.s3_edit || 0) + (r.s4_edit || 0), 0);
-    const maxPossible = totalMax;
-    const exposureRatio = maxPossible > 0 ? totalAllocated / maxPossible : 0;
-    const exposurePercent = Math.min(Math.max(exposureRatio * 100, 2), 98);
+    const exposurePercent = scaleToRangePercent(totalAllocated, totalMin, totalMax);
+    const midpoint = (totalMin + totalMax) / 2;
 
-    blockElement.querySelector('.exp-gauge-value').textContent = `${totalAllocated} / ${maxPossible} faces`;
+    blockElement.querySelector('.exp-gauge-value').textContent =
+        `${totalAllocated} faces  ·  média ${Math.round(midpoint)}  ·  min ${totalMin} / max ${totalMax}`;
+
     const expCursor = blockElement.querySelector('.exposure-cursor');
+    if (!expCursor) return;
     expCursor.style.left = `${exposurePercent}%`;
-
-    // Color feedback
-    if (exposureRatio > 0.75) {
-        expCursor.style.backgroundColor = '#10B981'; // green - good coverage
-    } else if (exposureRatio > 0.4) {
-        expCursor.style.backgroundColor = '#F59E0B'; // yellow - moderate
-    } else {
-        expCursor.style.backgroundColor = '#EF4444'; // red - under-exposed
-    }
+    expCursor.style.backgroundColor = pendulumColorFromCenter(exposurePercent);
 }
 
 function updateEfficiencyGauge(block, blockElement) {
     const rows = block.planningRows;
+    const allocated = rows.filter(r => (r.facesUsadas || 0) > 0);
 
-    // CPF range across active rows: MIN of cpf_minimo and MAX of cpf_maximo
-    // (sum would produce a meaningless aggregate that inflates with row count).
     let cpfMin = Infinity, cpfMax = 0;
-    let hasActiveRow = false;
-
-    rows.forEach(row => {
-        if (!row.facesUsadas || row.facesUsadas === 0) return;
-        hasActiveRow = true;
-
+    allocated.forEach(row => {
         const rowCpfMin = (row.cpf_minimo && row.cpf_minimo > 0) ? row.cpf_minimo : (row.custoFace || 0);
         const rowCpfMax = (row.cpf_maximo && row.cpf_maximo > 0) ? row.cpf_maximo : (row.unitario_bruto_tabela || 0);
-
         if (rowCpfMin > 0) cpfMin = Math.min(cpfMin, rowCpfMin);
         if (rowCpfMax > 0) cpfMax = Math.max(cpfMax, rowCpfMax);
     });
 
-    if (!hasActiveRow || cpfMin === Infinity) cpfMin = 0;
+    if (cpfMin === Infinity) cpfMin = 0;
 
     blockElement.querySelector('.eff-total-min').textContent = formatNumber(cpfMin);
     blockElement.querySelector('.eff-total-max').textContent = formatNumber(cpfMax);
 
-    // Efficiency gauge: composite of budget utilization + negotiation savings
+    const totalNeg = rows.reduce((s, r) => s + (r.ttNeg || 0), 0);
+    const totalFaces = rows.reduce((s, r) => s + (r.facesUsadas || 0), 0);
+    const avgCpf = totalFaces > 0 ? totalNeg / totalFaces : 0;
+
+    // Low CPF (cheaper / more rentable) sits on EFICIENTE (right). High CPF on INEFICIENTE.
+    const rawPercent = scaleToRangePercent(avgCpf, cpfMin, cpfMax);
+    const effPercent = clampGaugePercent(100 - rawPercent);
+
     const budget = block.budget || 0;
-    const totalNeg = rows.reduce((s, r) => s + r.ttNeg, 0);
-    const totalTabela = rows.reduce((s, r) => s + r.totalLinha, 0);
+    const overBudget = budget > 0 && totalNeg > budget * 1.05;
 
-    // Efficiency dimensions:
-    // 1) Negotiation savings: primary driver (0 to 100%)
-    const savingsRatio = totalTabela > 0 ? 1 - (totalNeg / totalTabela) : 0;
-    
-    // 2) Budget Adherence: penalty if over budget (only applies when budget is set)
-    const budgetRatio = budget > 0 ? totalNeg / budget : 0;
-    const overBudget = budget > 0 && budgetRatio > 1.05; // 5% grace margin
-
-    // Calculate efficiency score:
-    // Base score is savings % × 100 (e.g. 30% savings = 60 efficiency score baseline)
-    // Plus a bonus for staying within budget.
-    let effPercent;
-    
-    if (totalTabela === 0) {
-        effPercent = 2;
-    } else {
-        // Efficiency = (Savings Ratio * 80) + (Budget Adherence * 20)
-        // This ensures that increasing discount ALWAYS increases efficiency.
-        const savingsScore = savingsRatio * 80;
-        const adherenceScore = overBudget ? 0 : 20;
-        effPercent = savingsScore + adherenceScore;
-    }
-
-    effPercent = Math.min(Math.max(effPercent, 2), 98);
-
-    // Label
-    const remaining = budget - totalNeg;
-    const savingsPctText = (savingsRatio * 100).toFixed(0);
-    const usagePctText = (budgetRatio * 100).toFixed(0);
-    let remainingLabel;
+    let remainingLabel = `CPF médio ${formatCurrency(avgCpf)}`;
     if (overBudget) {
-        remainingLabel = `${formatCurrency(totalNeg)} (⚠️ ${usagePctText}% do budget)`;
-    } else {
-        remainingLabel = `${formatCurrency(totalNeg)} neg. (${savingsPctText}% de economia)`;
+        remainingLabel += `  ·  ⚠️ acima do budget`;
     }
 
     blockElement.querySelector('.eff-gauge-value').textContent = remainingLabel;
     const effCursor = blockElement.querySelector('.efficiency-cursor');
+    if (!effCursor) return;
     effCursor.style.left = `${effPercent}%`;
 
-    // Color feedback
     if (overBudget) {
-        effCursor.style.backgroundColor = '#EF4444'; // red - over budget
-    } else if (effPercent >= 70) {
-        effCursor.style.backgroundColor = '#10B981'; // green - strong efficiency
-    } else if (effPercent >= 40) {
-        effCursor.style.backgroundColor = '#F59E0B'; // yellow - moderate
+        effCursor.style.backgroundColor = '#EF4444';
+    } else if (effPercent >= 60) {
+        effCursor.style.backgroundColor = '#10B981';
+    } else if (effPercent >= 35) {
+        effCursor.style.backgroundColor = '#F59E0B';
     } else {
-        effCursor.style.backgroundColor = '#94A3B8'; // gray - low usage
+        effCursor.style.backgroundColor = '#EF4444';
     }
 }
 
@@ -1261,8 +1261,11 @@ function updateConsolidated() {
         });
     }
 
-    // Update map whenever consolidated data changes
-    renderMap();
+    try {
+        renderMap();
+    } catch (err) {
+        console.error('Mapa:', err);
+    }
 }
 
 // ============================================
@@ -1302,7 +1305,9 @@ function renderGlobalDashboard() {
     document.getElementById('gKpiRecortes').textContent = activeBlocks;
 
     // Destroy old charts before re-rendering
-    globalCharts.forEach(c => c.destroy());
+    globalCharts.forEach(c => {
+        try { c.destroy(); } catch (err) { /* already destroyed */ }
+    });
     globalCharts = [];
 
     const chartColors = [
@@ -1489,13 +1494,16 @@ function renderMap() {
         pracaData[praca].faces += totalFaces;
     });
 
-    // Initialize or clear map
+    // Initialize or rebuild map (Leaflet keeps a stale id on the container)
     if (mapInstance) {
         mapInstance.remove();
         mapInstance = null;
     }
+    if (mapContainer._leaflet_id) {
+        delete mapContainer._leaflet_id;
+    }
+    mapContainer.innerHTML = '';
 
-    // Always show Brazil fully — fixed center + zoom
     mapInstance = L.map(mapContainer, {
         center: [-14.2350, -51.9253],
         zoom: 4,
@@ -1550,8 +1558,10 @@ function resetBlock(blockId) {
     const blockElement = document.querySelector(`[data-block-id="${blockId}"]`);
     if (blockElement) {
         blockElement.querySelectorAll('input[type="number"]').forEach(input => input.value = '');
-        blockElement.querySelector('.input-campaign-cycle').value = '4';
+        const cycleInput = blockElement.querySelector('.input-campaign-cycle');
+        if (cycleInput) cycleInput.value = '4';
         blockElement.querySelectorAll('select').forEach(select => select.selectedIndex = 0);
+        updateCycleDisclaimer(blockElement, null);
     }
 
     updateBlockUI(blockId);

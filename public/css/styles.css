@@ -837,13 +837,12 @@ select.form-control {
 
 .gauge-slider-value {
     text-align: center;
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     font-weight: 700;
     color: var(--text-primary);
     margin-bottom: var(--spacing-xs);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    line-height: 1.35;
 }
 
 .slider-track {
